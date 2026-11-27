@@ -1,0 +1,12 @@
+-dontwarn net.schmizz.**
+-dontwarn com.hierynomus.**
+-dontwarn org.slf4j.impl.**
+-dontwarn javax.naming.**
+-dontwarn sun.security.**
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn javax.annotation.**
+-dontwarn javax.annotation.concurrent.**
+-keep class net.schmizz.sshj.** { *; }
+-keep class com.hierynomus.sshj.** { *; }
+-keep class org.spongycastle.jce.provider.BouncyCastleProvider { *; }
+-keep class org.spongycastle.** { *; }

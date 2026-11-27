@@ -22,3 +22,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "VpsConsole"
 include(":app")
+include(":revssh")
