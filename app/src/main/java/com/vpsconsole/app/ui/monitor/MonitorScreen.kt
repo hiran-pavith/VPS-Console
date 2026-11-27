@@ -319,7 +319,7 @@ private fun OverviewHero(
                 ) {
                     StatPill("Uptime", formatUptime(latest?.uptimeSec ?: 0))
                     StatPill("Load", String.format(Locale.US, "%.2f", latest?.load ?: 0f))
-                    StatPill("Updated", formatTimestamp(latest?.timestamp ?: 0L))
+                    StatPill("Updated", latest?.let { formatTimestamp(it.timestamp) } ?: "No data yet")
                 }
             }
         }
