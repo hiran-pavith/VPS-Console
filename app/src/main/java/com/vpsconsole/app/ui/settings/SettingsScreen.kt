@@ -1,5 +1,6 @@
 package com.vpsconsole.app.ui.settings
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -58,8 +59,8 @@ fun SettingsScreen() {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        SectionCard(title = "Appearance") {
-            Text("Theme", style = MaterialTheme.typography.bodyMedium)
+        SectionCard(title = "Appearance · Theme") {
+            Text("Mode", style = MaterialTheme.typography.bodyMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("system" to "System", "light" to "Light", "dark" to "Dark").forEach { (value, label) ->
                     FilterChip(
@@ -69,13 +70,58 @@ fun SettingsScreen() {
                     )
                 }
             }
-            Text("Terminal font: ${settings.terminalFontSize} sp")
+            Text("Accent color", style = MaterialTheme.typography.bodyMedium)
+            androidx.compose.foundation.layout.Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                AccentTheme.entries.forEach { theme ->
+                    FilterChip(
+                        selected = settings.accentColor.equals(theme.name, ignoreCase = true),
+                        onClick = { container.settings.update { it.copy(accentColor = theme.name) } },
+                        label = { Text(theme.label) }
+                    )
+                }
+            }
+        }
+
+        SectionCard(title = "Terminal") {
+            Text("Color scheme", style = MaterialTheme.typography.bodyMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TerminalScheme.entries.forEach { scheme ->
+                    FilterChip(
+                        selected = settings.terminalColorScheme.equals(scheme.name, ignoreCase = true),
+                        onClick = { container.settings.update { it.copy(terminalColorScheme = scheme.name) } },
+                        label = { Text(scheme.label) }
+                    )
+                }
+            }
+            Text("Font size: ${settings.terminalFontSize} sp")
             Slider(
                 value = settings.terminalFontSize.toFloat(),
                 onValueChange = { container.settings.update { s -> s.copy(terminalFontSize = it.toInt()) } },
                 valueRange = 9f..24f,
                 steps = 14
             )
+        }
+
+        SectionCard(title = "Dashboard & Servers") {
+            SwitchRow("Compact server cards", settings.dashboardCompact) {
+                container.settings.update { s -> s.copy(dashboardCompact = it) }
+            }
+            Text("Sort servers by", style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("name" to "Name", "host" to "Host", "group" to "Group").forEach { (value, label) ->
+                    FilterChip(
+                        selected = settings.serverSortOrder == value,
+                        onClick = { container.settings.update { it.copy(serverSortOrder = value) } },
+                        label = { Text(label) }
+                    )
+                }
+            }
         }
 
         SectionCard(title = "Monitoring") {
@@ -102,6 +148,9 @@ fun SettingsScreen() {
             SwitchRow("Auto-reconnect", settings.autoReconnect) {
                 container.settings.update { s -> s.copy(autoReconnect = it) }
             }
+            SwitchRow("Notification sound", settings.notificationSound) {
+                container.settings.update { s -> s.copy(notificationSound = it) }
+            }
             Text("Keep-alive interval: ${settings.keepAliveSeconds}s")
             Slider(
                 value = settings.keepAliveSeconds.toFloat(),
@@ -109,6 +158,21 @@ fun SettingsScreen() {
                 valueRange = 5f..120f,
                 steps = 23
             )
+        }
+
+        SectionCard(title = "Monitor gauges") {
+            SwitchRow("Show CPU gauge", settings.showCpuGauge) {
+                container.settings.update { s -> s.copy(showCpuGauge = it) }
+            }
+            SwitchRow("Show RAM gauge", settings.showRamGauge) {
+                container.settings.update { s -> s.copy(showRamGauge = it) }
+            }
+            SwitchRow("Show Disk gauge", settings.showDiskGauge) {
+                container.settings.update { s -> s.copy(showDiskGauge = it) }
+            }
+            SwitchRow("Show Network gauges", settings.showNetworkGauge) {
+                container.settings.update { s -> s.copy(showNetworkGauge = it) }
+            }
         }
 
         SectionCard(title = "Security") {
@@ -149,6 +213,28 @@ fun SettingsScreen() {
         SectionCard(title = "File manager") {
             SwitchRow("Show hidden files", settings.showHiddenFiles) {
                 container.settings.update { s -> s.copy(showHiddenFiles = it) }
+            }
+            Text("Default remote path", style = MaterialTheme.typography.bodyMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf("home" to "User home", "root" to "Root (/)", "custom" to "Custom").forEach { (value, label) ->
+                    FilterChip(
+                        selected = settings.sftpDefaultPath == value,
+                        onClick = { container.settings.update { it.copy(sftpDefaultPath = value) } },
+                        label = { Text(label) }
+                    )
+                }
+            }
+            if (settings.sftpDefaultPath == "custom") {
+                OutlinedTextField(
+                    value = settings.sftpCustomPath,
+                    onValueChange = { container.settings.update { s -> s.copy(sftpCustomPath = it) } },
+                    label = { Text("Custom path") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
             }
         }
 

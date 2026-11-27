@@ -60,6 +60,7 @@ fun FilesScreen(serverId: Long) {
     val container = LocalAppContainer.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val settings by container.settings.settings.collectAsState()
     var path by remember { mutableStateOf("") }
     var entries by remember { mutableStateOf<List<FileInfo>>(emptyList()) }
     var message by remember { mutableStateOf("") }
@@ -77,7 +78,13 @@ fun FilesScreen(serverId: Long) {
     suspend fun load() {
         busy = true
         val result = container.ssh.withSftp(serverId) { sftp ->
-            val target = if (path.isEmpty()) sftp.canonicalize(".").also { path = it } else path
+            val target = if (path.isEmpty()) {
+                when (settings.sftpDefaultPath) {
+                    "root" -> "/".also { path = it }
+                    "custom" -> settings.sftpCustomPath.ifBlank { "/" }.also { path = it }
+                    else -> sftp.canonicalize(".").also { path = it }
+                }
+            } else path
             listRemote(sftp, target)
         }
         result.onSuccess { entries = it }.onFailure { message = it.message ?: "Unable to list directory" }
