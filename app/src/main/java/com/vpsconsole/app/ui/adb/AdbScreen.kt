@@ -51,7 +51,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 
-private val adbTabs = listOf("Ports", "Shell", "Apps", "Logs", "Input", "Files", "Info")
+private val adbTabs = listOf("Ports", "Shell", "Apps", "Logs", "Input", "Files", "Info", "Host")
 
 @Composable
 fun AdbScreen(serverId: Long) {
@@ -107,6 +107,11 @@ fun AdbScreen(serverId: Long) {
 
     var infoOutput by remember { mutableStateOf("") }
     var processOutput by remember { mutableStateOf("") }
+
+    var hostTarget by remember { mutableStateOf("192.168.1.100:5555") }
+    var pairCode by remember { mutableStateOf("") }
+    var tcpipPort by remember { mutableStateOf("5555") }
+    var hostOutput by remember { mutableStateOf("") }
 
     fun runAdb(task: suspend () -> Result<String>, onResult: (String) -> Unit) {
         scope.launch {

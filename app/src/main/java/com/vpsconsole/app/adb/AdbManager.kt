@@ -29,6 +29,18 @@ class AdbManager(
 
     suspend fun devices(config: AdbConfig) = run(config, "devices -l")
 
+    suspend fun startServer(config: AdbConfig) = run(config, "start-server")
+    suspend fun killServer(config: AdbConfig) = run(config, "kill-server")
+    suspend fun version(config: AdbConfig) = run(config, "version")
+    suspend fun connect(config: AdbConfig, target: String) =
+        run(config, "connect ${quote(target)}")
+
+    suspend fun disconnect(config: AdbConfig, target: String) =
+        run(config, "disconnect ${quote(target)}")
+
+    suspend fun pair(config: AdbConfig, target: String, code: String) =
+        run(config, "pair ${quote(target)} ${quote(code)}")
+
     suspend fun reverseList(config: AdbConfig) = run(config, "reverse --list")
     suspend fun forwardList(config: AdbConfig) = run(config, "forward --list")
 
@@ -70,7 +82,7 @@ class AdbManager(
         shell(config, "logcat -d -t ${lines.coerceIn(20, 2000)}")
 
     suspend fun screenshot(config: AdbConfig) =
-        run(config, "exec-out screencap -p | base64 | tr -d '\\n'", 90)
+        run(config, "exec-out screencap -p 2>/dev/null | base64 | tr -d '\\n\\r'", 90)
 
     suspend fun inputTap(config: AdbConfig, x: Int, y: Int) =
         shell(config, "input tap $x $y")
@@ -94,6 +106,14 @@ class AdbManager(
 
     suspend fun processes(config: AdbConfig) =
         shell(config, "top -n 1 -m 30 2>/dev/null || ps -A")
+
+    suspend fun root(config: AdbConfig) = run(config, "root")
+    suspend fun unroot(config: AdbConfig) = run(config, "unroot")
+    suspend fun reboot(config: AdbConfig, mode: String = "") =
+        run(config, "reboot ${mode.trim()}".trim())
+
+    suspend fun tcpip(config: AdbConfig, port: Int) =
+        run(config, "tcpip ${port.coerceIn(1, 65535)}")
 
     suspend fun push(config: AdbConfig, hostPath: String, devicePath: String) =
         run(config, "push ${quote(hostPath)} ${quote(devicePath)}")
