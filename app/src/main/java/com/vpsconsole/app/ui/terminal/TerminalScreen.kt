@@ -43,7 +43,7 @@ import com.vpsconsole.app.ui.LocalAppContainer
 import kotlinx.coroutines.launch
 
 @Composable
-fun TerminalScreen(serverId: Long) {
+fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
     val container = LocalAppContainer.current
     val settings by container.settings.settings.collectAsState()
     val commands by container.commandRepo.forServer(serverId).collectAsState(emptyList())
@@ -97,8 +97,13 @@ fun TerminalScreen(serverId: Long) {
         }
     }
 
-    Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    val scheme = com.vpsconsole.app.ui.theme.TerminalScheme.from(settings.terminalColorScheme)
+    Column(
+        Modifier.fillMaxSize().padding(8.dp).background(androidx.compose.ui.graphics.Color(scheme.background)),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = onExit) { Text("← Back") }
             Text(
                 status,
                 Modifier.weight(1f),
@@ -126,11 +131,10 @@ fun TerminalScreen(serverId: Long) {
                     .fillMaxSize()
                     .verticalScroll(scroll)
                     .horizontalScroll(rememberScrollState())
-                    .padding(10.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                    .padding(10.dp),
                 fontFamily = FontFamily.Monospace,
                 fontSize = settings.terminalFontSize.sp,
-                color = MaterialTheme.colorScheme.onSurface
+                color = androidx.compose.ui.graphics.Color(scheme.foreground)
             )
         }
 

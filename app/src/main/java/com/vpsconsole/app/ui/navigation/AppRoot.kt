@@ -129,8 +129,12 @@ private fun AppScaffold(
     val container = LocalAppContainer.current
     val selectedServer = servers.firstOrNull { it.id == selectedId }
 
+    val fullScreenTerminal = route.startsWith("terminal")
     Scaffold(
         topBar = {
+            if (fullScreenTerminal) {
+                /* Terminal is full screen; its own controls include a back button */
+            } else {
             TopAppBar(
                 title = { Text(titleFor(route)) },
                 navigationIcon = {
@@ -173,9 +177,10 @@ private fun AppScaffold(
                     }
                 }
             )
+            }
         },
         bottomBar = {
-            if (showBottomBar) {
+            if (showBottomBar && !fullScreenTerminal) {
                 NavigationBar {
                     navItems.forEach { item ->
                         NavigationBarItem(
@@ -248,7 +253,10 @@ private fun AppNavGraph(nav: NavHostController, modifier: Modifier) {
             )
         }
         composable(Routes.TERMINAL, arguments = longArg) { entry ->
-            TerminalScreen(entry.arguments?.getLong("serverId") ?: 0L)
+            TerminalScreen(
+                serverId = entry.arguments?.getLong("serverId") ?: 0L,
+                onExit = { nav.navigate(Routes.SERVERS) }
+            )
         }
         composable(Routes.MONITOR, arguments = longArg) { entry ->
             MonitorScreen(entry.arguments?.getLong("serverId") ?: 0L)
