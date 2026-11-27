@@ -64,6 +64,8 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
     // A shell can finish starting after this screen has been disposed; never
     // publish such a shell, or it would keep running with no collector.
     var sessionActive by remember(serverId) { mutableStateOf(true) }
+    var directTyping by remember(serverId) { mutableStateOf(true) }
+    val inputFocus = remember { FocusRequester() }
     val scroll = rememberScrollState()
     val scope = rememberCoroutineScope()
 
@@ -150,6 +152,24 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
         }
     }
 
+    /** Send keystrokes straight to the PTY as the user types. */
+    fun typeDirect(next: String) {
+        val current = shell ?: run { input = next; return }
+        val change = diffInput(input, next)
+        repeat(change.backspaces) { current.write("\u007F") }
+        if (change.added.isNotEmpty()) current.write(change.added)
+        if (change.added.contains('\n')) {
+            val line = (input + change.added).trimEnd('\n', '\r')
+            if (line.isNotBlank()) {
+                history.add(line)
+                historyIndex = history.size
+            }
+            input = ""
+        } else {
+            input = next
+        }
+    }
+
     val scheme = com.vpsconsole.app.ui.theme.TerminalScheme.from(settings.terminalColorScheme)
     Column(
         Modifier.fillMaxSize().padding(8.dp).background(androidx.compose.ui.graphics.Color(scheme.background)),
@@ -171,11 +191,15 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
                 status = "Disconnected"
                 shell = null
             }) { Text("Disconnect") }
+            OutlinedButton(onClick = { directTyping = !directTyping }) {
+                Text(if (directTyping) "Direct: on" else "Direct: off")
+            }
             OutlinedButton(onClick = { buffer.clear(); rendered = "" }) { Text("Clear") }
         }
 
         Card(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
+            modifier = Modifier.weight(1f).fillMaxWidth()
+                .clickable { inputFocus.requestFocus() },
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
@@ -190,6 +214,38 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
                 fontSize = settings.terminalFontSize.sp,
                 color = androidx.compose.ui.graphics.Color(scheme.foreground)
             )
+        }
+
+        OutlinedTextField(
+            value = input,
+            onValueChange = { next -> if (directTyping) typeDirect(next) else input = next },
+            label = { Text(if (directTyping) "Type here · direct to shell" else "Command") },
+            modifier = Modifier.fillMaxWidth().focusRequester(inputFocus),
+            singleLine = true,
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Send),
+            keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                onSend = {
+                    send(input.ifEndsWithNewline())
+                    input = ""
+                }
+            ),
+            trailingIcon = {
+                IconButton(onClick = {
+                    send(input.ifEndsWithNewline())
+                    input = ""
+                }) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send") }
+            }
+        )
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = {
+                historyIndex = if (history.isEmpty()) 0 else (historyIndex - 1).coerceAtLeast(0)
+                input = history.getOrNull(historyIndex).orEmpty()
+            }, modifier = Modifier.weight(1f)) { Text("History ↑") }
+            Button(onClick = {
+                historyIndex = (historyIndex + 1).coerceAtMost(history.size)
+                input = history.getOrNull(historyIndex).orEmpty()
+            }, modifier = Modifier.weight(1f)) { Text("History ↓") }
         }
 
         Row(
@@ -217,40 +273,24 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
                 }
             }
         }
-
-        OutlinedTextField(
-            value = input,
-            onValueChange = { input = it },
-            label = { Text("Command") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Send),
-            keyboardActions = androidx.compose.foundation.text.KeyboardActions(
-                onSend = {
-                    val line = input.ifEmpty { "" }
-                    send(line.ifEndsWithNewline())
-                    input = ""
-                }
-            ),
-            trailingIcon = {
-                IconButton(onClick = {
-                    send(input.ifEndsWithNewline())
-                    input = ""
-                }) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send") }
-            }
-        )
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = {
-                historyIndex = if (history.isEmpty()) 0 else (historyIndex - 1).coerceAtLeast(0)
-                input = history.getOrNull(historyIndex).orEmpty()
-            }, modifier = Modifier.weight(1f)) { Text("History ↑") }
-            Button(onClick = {
-                historyIndex = (historyIndex + 1).coerceAtMost(history.size)
-                input = history.getOrNull(historyIndex).orEmpty()
-            }, modifier = Modifier.weight(1f)) { Text("History ↓") }
-        }
     }
 }
 
 private fun String.ifEndsWithNewline(): String = if (endsWith("\n")) this else "$this\n"
+
+private data class TerminalInputDiff(val backspaces: Int, val added: String)
+
+/** Minimum edit between two text-field values, used for direct PTY typing. */
+private fun diffInput(old: String, new: String): TerminalInputDiff {
+    var prefix = 0
+    while (prefix < old.length && prefix < new.length && old[prefix] == new[prefix]) prefix++
+    var suffix = 0
+    while (
+        suffix < old.length - prefix && suffix < new.length - prefix &&
+        old[old.length - 1 - suffix] == new[new.length - 1 - suffix]
+    ) suffix++
+    return TerminalInputDiff(
+        backspaces = old.length - prefix - suffix,
+        added = new.substring(prefix, new.length - suffix)
+    )
+}
