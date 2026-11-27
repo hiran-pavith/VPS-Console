@@ -9,6 +9,7 @@ import com.vpsconsole.app.data.repo.AlertRepository
 import com.vpsconsole.app.data.repo.CommandRepository
 import com.vpsconsole.app.data.repo.KnownHostRepository
 import com.vpsconsole.app.data.repo.MetricRepository
+import com.vpsconsole.app.data.repo.NoteRepository
 import com.vpsconsole.app.data.repo.ServerRepository
 import com.vpsconsole.app.data.repo.TunnelRepository
 import com.vpsconsole.app.data.secure.SecretsStore

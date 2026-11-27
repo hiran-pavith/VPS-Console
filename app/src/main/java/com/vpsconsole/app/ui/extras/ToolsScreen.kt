@@ -49,8 +49,8 @@ private val tools = listOf(
     ToolItem("SSH tunnels", "local and remote forwarding", Icons.Filled.Tune, Routes::tunnels),
     ToolItem("ADB console", "reverse ports, shell, logs, files", Icons.Filled.Computer, Routes::adb),
     ToolItem("Command library", "saved snippets", Icons.Filled.Terminal, Routes::commands),
-    ToolItem("Notes", "server notes and global notes", Icons.Filled.Description) { Routes.notes },
-    ToolItem("Account & sync", "Google login, encrypted sync file", Icons.Filled.Backup) { Routes.sync }
+    ToolItem("Notes", "server notes and global notes", Icons.Filled.Description) { Routes.notes() },
+    ToolItem("Account & sync", "Google login, encrypted sync file", Icons.Filled.Backup) { Routes.sync() }
 )
 
 @Composable

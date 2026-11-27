@@ -37,5 +37,7 @@ object Routes {
     fun tunnels(id: Long) = "tunnels/$id"
     fun scripts(id: Long) = "scripts/$id"
     fun commands(id: Long) = "commands/$id"
+    fun notes() = "notes"
+    fun sync() = "sync"
     fun adb(id: Long) = "adb/$id"
 }
