@@ -78,16 +78,21 @@ class MainActivity : ComponentActivity() {
     private fun validate(config: TunnelConfig): Boolean {
         val rp = config.remotePort.trim().toIntOrNull()
         val tp = config.targetPort.trim().toIntOrNull()
-        when {
-            config.host.isBlank() -> TunnelState.log("Server host is required")
-            config.username.isBlank() -> TunnelState.log("SSH username is required")
-            rp == null || rp !in 1..65535 -> TunnelState.log("Remote port must be 1-65535")
-            tp == null || tp !in 1..65535 -> TunnelState.log("Target port must be 1-65535")
-            config.authType == "KEY" && config.privateKey.isBlank() -> TunnelState.log("Private key is required")
-            config.authType == "PASSWORD" && config.password.isBlank() -> TunnelState.log("Password is required")
-            else -> return true
+        val error = when {
+            config.host.isBlank() -> "server host is required"
+            config.username.isBlank() -> "SSH username is required"
+            rp == null || rp !in 1..65535 -> "remote port must be 1-65535"
+            tp == null || tp !in 1..65535 -> "target port must be 1-65535"
+            config.authType == "KEY" && config.privateKey.isBlank() -> "private key is required"
+            config.authType == "PASSWORD" && config.password.isBlank() -> "password is required"
+            else -> null
         }
-        return false
+        if (error != null) {
+            TunnelState.status.value = "Error: $error"
+            TunnelState.log("Configuration error: $error")
+            return false
+        }
+        return true
     }
 }
 
@@ -183,6 +188,11 @@ private fun TunnelScreen(
                         onCheckedChange = { config = config.copy(autoReconnect = it) })
                 }
             }
+        }
+
+        if (status.startsWith("Error")) {
+            Text(status, color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium)
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

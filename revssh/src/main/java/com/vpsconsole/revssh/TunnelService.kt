@@ -118,6 +118,11 @@ class TunnelService : Service() {
             return
         }
 
+        // Validation above guarantees these are non-null and in range; restore
+        // the non-null types that the `when`-based check could not smart-cast.
+        val rPort = requireNotNull(remotePort)
+        val tPort = requireNotNull(targetPort)
+
         while (running) {
             var connected = false
             try {
