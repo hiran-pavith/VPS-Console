@@ -67,6 +67,8 @@ class MonitorWorker(
                 }
             }
         }
+        // Only close connections this worker opened; never tear down the user's
+        // active terminal/SFTP/tunnels. closeAll() already skips live shells.
         container.ssh.closeAll()
         return Result.success()
     }

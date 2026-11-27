@@ -170,30 +170,40 @@ class SshManager(
             handles[serverId] = Handle(server, client)
             setState(serverId, ConnectionState.CONNECTED)
             serverRepo.touch(serverId, System.currentTimeMillis())
-        }.onFailure { error ->
-            runCatching { client.disconnect() }
-            setState(serverId, ConnectionState.FAILED, error.message ?: "Connection failed")
+            }.onFailure { error ->
+                runCatching { client.disconnect() }
+                setState(serverId, ConnectionState.FAILED, error.message ?: "Connection failed")
+            }
         }
     }
 
     fun close(serverId: Long) {
-        val handle = handles.remove(serverId)
-        runCatching { handle?.shell?.close() }
-        if (handle != null) handle.shell = null
-        runCatching { handle?.client?.disconnect() }
-        activeTunnels.filter { it.value.serverId == serverId }.keys.forEach(::stopTunnel)
-        setState(serverId, ConnectionState.DISCONNECTED)
+        synchronized(lockFor(serverId)) {
+            val handle = handles.remove(serverId)
+            runCatching { handle?.shell?.close() }
+            if (handle != null) handle.shell = null
+            runCatching { handle?.client?.disconnect() }
+            activeTunnels.filter { it.value.serverId == serverId }.keys.forEach(::stopTunnel)
+            setState(serverId, ConnectionState.DISCONNECTED)
+        }
     }
 
     /** Close just the interactive shell, keeping the SSH connection. */
     fun closeShell(serverId: Long) {
-        val handle = handles[serverId] ?: return
-        runCatching { handle.shell?.close() }
-        handle.shell = null
+        synchronized(lockFor(serverId)) {
+            val handle = handles[serverId] ?: return@synchronized
+            runCatching { handle.shell?.close() }
+            handle.shell = null
+        }
     }
 
+    /** Close all idle connections, but keep sessions with a live interactive shell. */
     fun closeAll() {
-        handles.keys.toList().forEach(::close)
+        handles.keys.toList().forEach { id ->
+            val handle = handles[id]
+            if (handle?.shell?.closed?.value == false) return@forEach
+            close(id)
+        }
     }
 
     suspend fun exec(serverId: Long, command: String, timeoutSeconds: Long = 45): Result<String> =
@@ -227,24 +237,33 @@ class SshManager(
         }
 
     suspend fun startShell(serverId: Long): Result<ShellSession> = withContext(Dispatchers.IO) {
-        runCatching {
-            ensureConnected(serverId)
-            val handle = handles[serverId]
-                ?: throw IllegalStateException("SSH connection is not available")
-            handle.shell?.let { existing ->
-                if (!existing.closed.value) return@runCatching existing
-                runCatching { existing.close() }
-                handle.shell = null
+        ensureConnected(serverId)
+        synchronized(lockFor(serverId)) {
+            runCatching {
+                val handle = handles[serverId]
+                    ?: throw IllegalStateException("SSH connection is not available")
+                handle.shell?.let { existing ->
+                    if (!existing.closed.value) return@runCatching existing
+                    runCatching { existing.close() }
+                    handle.shell = null
+                }
+                val session = ShellSession(handle.client)
+                // Only publish if the handle is still the one we authenticated.
+                if (handles[serverId] !== handle) {
+                    runCatching { session.close() }
+                    throw IllegalStateException("SSH connection changed during shell start")
+                }
+                handle.shell = session
+                session
             }
-            val session = ShellSession(handle.client)
-            handle.shell = session
-            session
         }
     }
 
     suspend fun collect(serverId: Long): Result<MetricEntity> = withContext(Dispatchers.IO) {
-        runCatching {
-            val raw = ensureConnected(serverId).let { client ->
+        // Probe outside the lock, but make the baseline swap atomic so concurrent
+        // worker/UI refreshes cannot compute deltas against the same counters.
+        val rawResult = runCatching {
+            ensureConnected(serverId).let { client ->
                 val session = client.startSession()
                 try {
                     val cmd = session.exec(MetricsCollector.PROBE_COMMAND)
@@ -253,10 +272,14 @@ class SshManager(
                     runCatching { session.close() }
                 }
             }
-            val metric = collector.parse(raw, serverId, lastMetrics[serverId], System.currentTimeMillis())
-            lastMetrics[serverId] = metric
-            metricRepo.add(metric)
-            metric
+        }
+        rawResult.mapCatching { raw ->
+            synchronized(lockFor(serverId)) {
+                val metric = collector.parse(raw, serverId, lastMetrics[serverId], System.currentTimeMillis())
+                lastMetrics[serverId] = metric
+                metricRepo.add(metric)
+                metric
+            }
         }
     }
 
