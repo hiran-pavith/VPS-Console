@@ -203,9 +203,11 @@ class SshManager(
         }
     }
 
-    /** Close all idle connections, but keep sessions with a live interactive shell. */
+    /** Close all idle connections, but keep sessions with a live shell or tunnel. */
     fun closeAll() {
+        val busyServers = activeTunnels.values.map { it.serverId }.toSet()
         handles.keys.toList().forEach { id ->
+            if (id in busyServers) return@forEach
             val handle = handles[id]
             if (handle?.shell?.closed?.value == false) return@forEach
             close(id)

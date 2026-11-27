@@ -157,7 +157,7 @@ fun CronScreen(serverId: Long) {
                 // comments/blanks so indexes into `entries` and `raw.lines()` diverge.
                 val target = entries.getOrNull(index)?.raw
                 scope.launch {
-                    if (target != null) write(raw.lines().filter { it != target })
+                    if (target != null) write(raw.lines().filter { it.trim() != target })
                     pendingDelete = null
                 }
             },
