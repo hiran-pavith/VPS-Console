@@ -54,6 +54,8 @@ fun ServerEditScreen(serverId: Long, onSaved: () -> Unit, onCancel: () -> Unit) 
     var port by remember { mutableStateOf("22") }
     var username by remember { mutableStateOf("root") }
     var authType by remember { mutableStateOf(AuthType.KEY) }
+    var originalAuthType by remember { mutableStateOf<AuthType?>(null) }
+    var colorArgb by remember { mutableStateOf(0xFF3FB950L) }
     var secret by remember { mutableStateOf("") }
     var keyFileName by remember { mutableStateOf("") }
     var passphrase by remember { mutableStateOf("") }
@@ -99,6 +101,8 @@ fun ServerEditScreen(serverId: Long, onSaved: () -> Unit, onCancel: () -> Unit) 
         port = server.port.toString()
         username = server.username
         authType = server.authType
+        originalAuthType = server.authType
+        colorArgb = server.colorArgb
         group = server.group
         note = server.note
         monitoring = server.monitoringEnabled
@@ -117,6 +121,10 @@ fun ServerEditScreen(serverId: Long, onSaved: () -> Unit, onCancel: () -> Unit) 
             error = "Provide a password or private key."
             return null
         }
+        if (serverId != 0L && originalAuthType != null && authType != originalAuthType && secret.isBlank()) {
+            error = "Provide a new password or private key when changing auth type."
+            return null
+        }
         return ServerProfile(
             id = serverId,
             name = name.trim(),
@@ -124,8 +132,9 @@ fun ServerEditScreen(serverId: Long, onSaved: () -> Unit, onCancel: () -> Unit) 
             port = port.toInt(),
             username = username.trim(),
             authType = authType,
-            secretRef = existing?.secretRef ?: "",
-            keyPassphraseRef = if (authType == AuthType.KEY) existing?.keyPassphraseRef else null,
+            secretRef = if (authType == originalAuthType) existing?.secretRef ?: "" else "",
+            keyPassphraseRef = if (authType == AuthType.KEY && authType == originalAuthType) existing?.keyPassphraseRef else null,
+            colorArgb = colorArgb,
             group = group.trim(),
             note = note.trim(),
             monitoringEnabled = monitoring,
@@ -244,30 +253,36 @@ fun ServerEditScreen(serverId: Long, onSaved: () -> Unit, onCancel: () -> Unit) 
 
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(
-                onClick = {
-                    scope.launch { if (save() != null) onSaved() }
-                },
-                enabled = !busy,
-                modifier = Modifier.weight(1f)
-            ) { Text("Save") }
-            OutlinedButton(
-                onClick = {
-                    scope.launch {
-                        busy = true
-                        val id = save()
-                        if (id != null) {
-                            val result = container.ssh.connect(id)
-                            error = result.exceptionOrNull()?.message ?: "Connection successful"
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            busy = true
+                            if (save() != null) onSaved()
+                            busy = false
                         }
-                        busy = false
-                    }
-                },
-                enabled = !busy,
-                modifier = Modifier.weight(1f)
-            ) { Text("Save & test") }
-            OutlinedButton(onClick = onCancel) { Text("Cancel") }
+                    },
+                    enabled = !busy,
+                    modifier = Modifier.weight(1f)
+                ) { Text("Save") }
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            busy = true
+                            val id = save()
+                            if (id != null) {
+                                val result = container.ssh.connect(id)
+                                error = result.exceptionOrNull()?.message ?: "Connection successful"
+                            }
+                            busy = false
+                        }
+                    },
+                    enabled = !busy,
+                    modifier = Modifier.weight(1f)
+                ) { Text("Save & test") }
+            }
+            OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text("Cancel") }
         }
     }
 }

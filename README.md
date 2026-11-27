@@ -31,11 +31,12 @@ Or open the folder in Android Studio and run the `app` configuration on a device
 
 ## First steps
 
-1. Open **Servers → Add VPS**.
-2. Enter host, SSH port, username, and either a password or a private key. Secret fields are left blank when editing to keep the stored value.
-3. Tap **Save & test** to verify host-key trust and authentication.
-4. Use the top bar server picker to choose the active server for Terminal/Tools.
-5. Monitoring runs automatically in the background every 15 minutes; alerts appear as notifications and in **Alerts**.
+1. A preconfigured entry for the hosting VPS (`admin@54.253.196.217`) is seeded once on first launch with its private key already stored. Open **Servers** and tap **Connect** to use it. The key is injected at build time from `local.properties` (`VPS_CONSOLE_DEFAULT_KEY`), never checked into source.
+2. To add more, open **Servers → Add VPS**.
+3. Enter host, SSH port, username, and either a password or a private key. Secret fields are left blank when editing to keep the stored value.
+4. Tap **Save & test** to verify host-key trust and authentication.
+5. Use the top bar server picker to choose the active server for Terminal/Tools.
+6. Monitoring runs automatically in the background every 15 minutes; alerts appear as notifications and in **Alerts**.
 
 ## Security notes
 
@@ -55,4 +56,8 @@ app/src/main/java/com/vpsconsole/app/
 └── ui/          Compose screens, navigation, theme, shared components
 ```
 
-Key dependencies: SSHJ 0.38.0 (Terrapin mitigation), Room 2.6.1, WorkManager 2.10.0, Jetpack Compose BOM 2024.12.01, Security Crypto 1.1.0-alpha06.
+Key dependencies: SSHJ 0.38.0 (Terrapin mitigation), SpongyCastle 1.58.0.0 (Android JCE provider — fixes `no such algorithm ... for provider BC` / `ECDSA KeyFactory not available`), Room 2.6.1, WorkManager 2.10.0, Jetpack Compose BOM 2024.12.01, Security Crypto 1.1.0-alpha06.
+
+### Android crypto provider
+
+SSHJ asks for JCA algorithms by name (`SHA-256`, `ECDSA` KeyFactory, `MD5`, `ECDH`, ...). Android's bundled BC provider is incomplete and caused connection failures, so the app registers **SpongyCastle** as SSHJ's provider. X25519/curve25519 and Ed25519 KEX/host-key algorithms are filtered out because SpongyCastle 1.58 does not expose those mappings; ECDH/RSA/DSA/DH are used instead.

@@ -254,9 +254,9 @@ private fun ServiceRow(service: ServiceInfo, onLogs: () -> Unit, onAction: (Stri
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf("start", "stop", "restart").forEach { action ->
-                    OutlinedButton(onClick = { onAction(action) }) { Text(action) }
+                    OutlinedButton(onClick = { onAction(action) }, modifier = Modifier.weight(1f)) { Text(action) }
                 }
-                TextButton(onClick = onLogs) { Text("Logs") }
+                TextButton(onClick = onLogs, modifier = Modifier.weight(1f)) { Text("Logs") }
             }
         }
     }

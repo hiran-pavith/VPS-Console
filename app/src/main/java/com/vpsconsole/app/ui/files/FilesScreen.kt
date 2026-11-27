@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
@@ -81,7 +85,9 @@ fun FilesScreen(serverId: Long) {
 
     val pickUpload = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
-            upload(context, container.ssh, serverId, uri, joinRemote(path, uriFileName(context, uri) ?: "upload"))
+            runCatching {
+                upload(context, container.ssh, serverId, uri, joinRemote(path, uriFileName(context, uri) ?: "upload"))
+            }.onFailure { message = it.message ?: "Upload failed" }
             load()
         }
     }
@@ -90,8 +96,10 @@ fun FilesScreen(serverId: Long) {
         downloadTarget = null
         if (uri != null && target != null) {
             scope.launch {
-                download(context, container.ssh, serverId, target.path, uri)
-                message = "Downloaded ${target.name}"
+                runCatching {
+                    download(context, container.ssh, serverId, target.path, uri)
+                    message = "Downloaded ${target.name}"
+                }.onFailure { message = it.message ?: "Download failed" }
             }
         }
     }
@@ -106,7 +114,10 @@ fun FilesScreen(serverId: Long) {
                 )
                 Button(onClick = { scope.launch { load() } }, enabled = !busy) { Text("Go") }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 OutlinedButton(onClick = { path = if (path == "/") "/" else path.substringBeforeLast('/').ifEmpty { "/" } }) {
                     Text("Up")
                 }
@@ -121,7 +132,7 @@ fun FilesScreen(serverId: Long) {
             }
         }
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             items(entries, key = { it.path }) { item ->
                 Card(
                     Modifier.fillMaxWidth(),
@@ -160,11 +171,17 @@ fun FilesScreen(serverId: Long) {
                                 pickDownload.launch(item.name)
                             }) { Icon(Icons.Filled.Download, contentDescription = "Download") }
                         }
-                        IconButton(onClick = { renaming = item }) { Text("✎") }
-                        IconButton(onClick = {
-                            modeText = item.permissions
-                            chmodTarget = item
-                        }) { Text("#") }
+                        IconButton(
+                            onClick = { renaming = item },
+                            modifier = Modifier.semantics { contentDescription = "Rename" }
+                        ) { Text("✎") }
+                        IconButton(
+                            onClick = {
+                                modeText = item.permissions
+                                chmodTarget = item
+                            },
+                            modifier = Modifier.semantics { contentDescription = "Change permissions" }
+                        ) { Text("#") }
                         IconButton(onClick = { deleteTarget = item }) {
                             Icon(Icons.Filled.Delete, contentDescription = "Delete")
                         }
@@ -263,7 +280,8 @@ fun FilesScreen(serverId: Long) {
                     val mode = modeText.toIntOrNull(8)
                     if (mode != null) {
                         scope.launch {
-                            container.ssh.withSftp(serverId) { sftp -> sftp.chmod(file.path, mode) }
+                            val result = container.ssh.withSftp(serverId) { sftp -> sftp.chmod(file.path, mode) }
+                            result.onFailure { message = it.message ?: "chmod failed" }
                             chmodTarget = null; load()
                         }
                     }

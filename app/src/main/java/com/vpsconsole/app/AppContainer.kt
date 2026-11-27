@@ -31,10 +31,10 @@ class AppContainer(context: Context) {
     val ssh = SshManager(appContext, serverRepo, knownHostRepo, metricRepo, settings)
     val notifier = AlertsNotifier(appContext)
 
-    /** Seeds the preconfigured hosting VPS on first launch if no servers exist. */
+    /** Seeds the preconfigured hosting VPS once, on first launch only. */
     suspend fun seedDefaultServerIfNeeded() {
-        if (serverRepo.all().isEmpty()) {
-            serverRepo.save(DefaultServer.profile(), DefaultServer.PRIVATE_KEY, null)
-        }
+        if (settings.settings.value.defaultServerSeeded) return
+        val id = serverRepo.save(DefaultServer.profile(), DefaultServer.PRIVATE_KEY, null)
+        settings.update { it.copy(selectedServerId = id, defaultServerSeeded = true) }
     }
 }

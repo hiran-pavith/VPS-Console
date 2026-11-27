@@ -134,7 +134,10 @@ fun TerminalScreen(serverId: Long) {
             )
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
             listOf(
                 "Ctrl+C" to "\u0003", "Tab" to "\t", "Esc" to "\u001B",
                 "↑" to "\u001B[A", "↓" to "\u001B[B", "Ctrl+D" to "\u0004"

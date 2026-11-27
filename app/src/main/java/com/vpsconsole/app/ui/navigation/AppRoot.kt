@@ -150,6 +150,16 @@ private fun AppScaffold(
                                 text = { Text(server.name) },
                                 onClick = {
                                     container.settings.update { it.copy(selectedServerId = server.id) }
+                                    // Re-navigate server-scoped screens so they pick up the new server
+                                    val target = when {
+                                        route.startsWith("terminal") -> Routes.terminal(server.id)
+                                        route.startsWith("tools") -> Routes.tools(server.id)
+                                        route.startsWith("monitor") -> Routes.monitor(server.id)
+                                        route.startsWith("services") -> Routes.services(server.id)
+                                        route.startsWith("files") -> Routes.files(server.id)
+                                        else -> null
+                                    }
+                                    if (target != null) nav.navigate(target) { launchSingleTop = true }
                                     serverMenu = false
                                 }
                             )

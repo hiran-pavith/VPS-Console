@@ -21,7 +21,8 @@ data class AppSettings(
     val autoReconnect: Boolean = true,
     val keepAliveSeconds: Int = 30,
     val metricHistoryHours: Int = 24,
-    val confirmDangerousCommands: Boolean = true
+    val confirmDangerousCommands: Boolean = true,
+    val defaultServerSeeded: Boolean = false
 )
 
 class SettingsStore(context: Context) {
@@ -47,7 +48,8 @@ class SettingsStore(context: Context) {
         autoReconnect = prefs.getBoolean(AUTO_RECONNECT, true),
         keepAliveSeconds = prefs.getInt(KEEP_ALIVE, 30).coerceIn(5, 120),
         metricHistoryHours = prefs.getInt(HISTORY_HOURS, 24).coerceIn(1, 168),
-        confirmDangerousCommands = prefs.getBoolean(CONFIRM_DANGEROUS, true)
+        confirmDangerousCommands = prefs.getBoolean(CONFIRM_DANGEROUS, true),
+        defaultServerSeeded = prefs.getBoolean(DEFAULT_SERVER_SEEDED, false)
     )
 
     fun update(transform: (AppSettings) -> AppSettings) {
@@ -67,6 +69,7 @@ class SettingsStore(context: Context) {
             putInt(KEEP_ALIVE, next.keepAliveSeconds)
             putInt(HISTORY_HOURS, next.metricHistoryHours)
             putBoolean(CONFIRM_DANGEROUS, next.confirmDangerousCommands)
+            putBoolean(DEFAULT_SERVER_SEEDED, next.defaultServerSeeded)
         }.apply()
         _settings.value = next
     }
@@ -90,5 +93,6 @@ class SettingsStore(context: Context) {
         const val KEEP_ALIVE = "keep_alive_seconds"
         const val HISTORY_HOURS = "history_hours"
         const val CONFIRM_DANGEROUS = "confirm_dangerous"
+        const val DEFAULT_SERVER_SEEDED = "default_server_seeded"
     }
 }

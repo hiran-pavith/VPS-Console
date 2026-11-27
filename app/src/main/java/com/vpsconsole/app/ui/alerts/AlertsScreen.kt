@@ -26,6 +26,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vpsconsole.app.core.formatTimestamp
@@ -122,9 +124,12 @@ fun AlertsScreen(onOpenServer: (Long) -> Unit) {
                                     checked = rule.enabled,
                                     onCheckedChange = { scope.launch { container.alertRepo.saveRule(rule.copy(enabled = it)) } }
                                 )
-                                IconButton(onClick = { scope.launch { container.alertRepo.deleteRule(rule) } }) {
-                                    Text("✕")
-                                }
+                                IconButton(
+                                    onClick = { scope.launch { container.alertRepo.deleteRule(rule) } },
+                                    modifier = androidx.compose.ui.Modifier.semantics {
+                                        contentDescription = "Delete alert rule"
+                                    }
+                                ) { Text("✕") }
                             }
                         }
                     }

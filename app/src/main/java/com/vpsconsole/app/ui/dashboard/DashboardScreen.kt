@@ -48,7 +48,7 @@ fun DashboardScreen(
     val states by container.ssh.states.collectAsState(emptyMap())
     val events by container.alertRepo.events.collectAsState(emptyList())
     val scope = rememberCoroutineScope()
-    val online = servers.count { states[it.id]?.name == "CONNECTED" }
+    val online = servers.count { states[it.id] == com.vpsconsole.app.ssh.ConnectionState.CONNECTED }
     val unread = events.count { !it.acknowledged }
 
     LazyColumn(

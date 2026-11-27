@@ -14,15 +14,25 @@ class AlertsNotifier(private val context: Context) {
     private val manager = NotificationManagerCompat.from(context)
 
     init {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            context.getString(R.string.notification_channel_alerts),
-            NotificationManager.IMPORTANCE_HIGH
-        ).apply {
-            description = context.getString(R.string.notification_channel_desc)
-            enableVibration(true)
-        }
-        context.getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
+        val nm = context.getSystemService(NotificationManager::class.java)
+        val name = context.getString(R.string.notification_channel_alerts)
+        val desc = context.getString(R.string.notification_channel_desc)
+        // Two channels so the Vibration setting actually works on Android 8+
+        // (per-notification vibration is overridden by the channel).
+        nm?.createNotificationChannel(
+            NotificationChannel(CHANNEL_ID, name, NotificationManager.IMPORTANCE_HIGH).apply {
+                description = desc
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 300, 150, 300)
+            }
+        )
+        nm?.createNotificationChannel(
+            NotificationChannel(CHANNEL_SILENT, "$name (silent)", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = desc
+                enableVibration(false)
+                vibrationPattern = null
+            }
+        )
     }
 
     fun alert(id: Long, title: String, body: String, vibration: Boolean) {
@@ -35,7 +45,7 @@ class AlertsNotifier(private val context: Context) {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val notification = NotificationCompat.Builder(context, if (vibration) CHANNEL_ID else CHANNEL_SILENT)
             .setSmallIcon(R.drawable.ic_launcher)
             .setContentTitle(title)
             .setContentText(body)
@@ -43,7 +53,6 @@ class AlertsNotifier(private val context: Context) {
             .setContentIntent(pending)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setVibrate(if (vibration) longArrayOf(0, 300, 150, 300) else null)
             .build()
         try {
             manager.notify(id.toInt(), notification)
@@ -54,5 +63,6 @@ class AlertsNotifier(private val context: Context) {
 
     companion object {
         const val CHANNEL_ID = "vps_alerts"
+        const val CHANNEL_SILENT = "vps_alerts_silent"
     }
 }

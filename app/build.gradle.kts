@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -20,7 +22,7 @@ android {
         // Keep the seeded SSH key out of source control. Set it in the
         // gitignored local.properties as VPS_CONSOLE_DEFAULT_KEY with
         // newlines escaped as \n.
-        val localProps = java.util.Properties().apply {
+        val localProps = Properties().apply {
             val file = rootProject.file("local.properties")
             if (file.exists()) file.inputStream().use { load(it) }
         }
