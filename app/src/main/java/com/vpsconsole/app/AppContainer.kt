@@ -35,7 +35,11 @@ class AppContainer(context: Context) {
     suspend fun seedDefaultServerIfNeeded() {
         val currentHash = com.vpsconsole.app.BuildConfig.DEFAULT_SERVER_KEY_HASH
         val s = settings.settings.value
-        if (s.defaultServerSeeded && s.seededKeyHash == currentHash) return
+        if (s.defaultServerSeeded && s.seededKeyHash == currentHash) {
+            // Upgrades from builds that did not create threshold rules need them now.
+            serverRepo.all().forEach { alertRepo.syncServerThresholdRules(it) }
+            return
+        }
 
         // Find the previously seeded server by its known host/user (survives DB id changes).
         val existing = serverRepo.all().firstOrNull {
