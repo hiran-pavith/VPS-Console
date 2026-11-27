@@ -175,6 +175,30 @@ fun SettingsScreen() {
             SwitchRow("Show Network gauges", settings.showNetworkGauge) {
                 container.settings.update { s -> s.copy(showNetworkGauge = it) }
             }
+            SwitchRow("Show Load gauge", settings.showLoadGauge) {
+                container.settings.update { s -> s.copy(showLoadGauge = it) }
+            }
+            SwitchRow("Trend lines", settings.monitorShowTrends) {
+                container.settings.update { s -> s.copy(monitorShowTrends = it) }
+            }
+            SwitchRow("Detail rows", settings.monitorShowDetails) {
+                container.settings.update { s -> s.copy(monitorShowDetails = it) }
+            }
+            Text("Widget size", style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("compact" to "Compact", "regular" to "Regular", "large" to "Large").forEach { (value, label) ->
+                    FilterChip(
+                        selected = settings.monitorWidgetSize == value,
+                        onClick = { container.settings.update { s -> s.copy(monitorWidgetSize = value) } },
+                        label = { Text(label) }
+                    )
+                }
+            }
+            Text(
+                "Reorder and fine-tune widgets from the Customize button on the Monitoring screen.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
 
         SectionCard(title = "Security") {
