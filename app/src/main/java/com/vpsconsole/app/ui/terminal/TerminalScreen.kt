@@ -108,7 +108,7 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
     }
 
     fun send(text: String, appendHistory: Boolean = true) {
-        if (text.isEmpty()) return
+        if (text.isEmpty() || shell == null) return
         shell?.write(text)
         if (appendHistory) {
             history.add(text.trimEnd('\n', '\r'))

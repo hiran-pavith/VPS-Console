@@ -102,11 +102,18 @@ fun DashboardScreen(
                 shape = CardDefaults.shape,
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(
+                    Modifier.padding(if (compact) 8.dp else 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 10.dp)
+                ) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text(server.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                             Text(
+                                server.name,
+                                style = if (compact) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            if (!compact) Text(
                                 "${server.username}@${server.host}:${server.port}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
