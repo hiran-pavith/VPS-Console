@@ -11,6 +11,7 @@ import com.vpsconsole.app.data.model.AlertRuleEntity
 import com.vpsconsole.app.data.model.CommandEntity
 import com.vpsconsole.app.data.model.KnownHostEntity
 import com.vpsconsole.app.data.model.MetricEntity
+import com.vpsconsole.app.data.model.MetricKind
 import com.vpsconsole.app.data.model.ServerProfile
 import com.vpsconsole.app.data.model.TunnelEntity
 import com.vpsconsole.app.data.secure.SecretsStore
@@ -89,6 +90,31 @@ class AlertRepository(private val dao: AlertDao) {
     suspend fun acknowledge(event: AlertEventEntity) = dao.updateEvent(event.copy(acknowledged = true))
     suspend fun deleteEvent(event: AlertEventEntity) = dao.deleteEvent(event)
     suspend fun clearEvents() = dao.clearEvents()
+
+    /** Keep the auto-created threshold rules in sync with the server profile. */
+    suspend fun syncServerThresholdRules(server: ServerProfile) {
+        val existing = dao.rulesFor(server.id)
+        val thresholds = listOf(
+            MetricKind.CPU to server.cpuThreshold,
+            MetricKind.RAM to server.ramThreshold,
+            MetricKind.DISK to server.diskThreshold
+        )
+        thresholds.forEach { (kind, rawThreshold) ->
+            val threshold = rawThreshold.takeIf { it.isFinite() }?.coerceIn(1f, 100f) ?: return@forEach
+            val current = existing.firstOrNull { it.kind == kind && it.isServerThreshold }
+            when {
+                current == null -> dao.insertRule(
+                    AlertRuleEntity(
+                        serverId = server.id,
+                        kind = kind,
+                        threshold = threshold,
+                        isServerThreshold = true
+                    )
+                )
+                current.threshold != threshold -> dao.updateRule(current.copy(threshold = threshold))
+            }
+        }
+    }
 }
 
 class CommandRepository(private val dao: CommandDao) {

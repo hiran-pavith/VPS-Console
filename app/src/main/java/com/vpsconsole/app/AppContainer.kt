@@ -54,9 +54,11 @@ class AppContainer(context: Context) {
             DefaultServer.PRIVATE_KEY,
             null
         )
+        serverRepo.get(id)?.let { alertRepo.syncServerThresholdRules(it) }
         settings.update {
             it.copy(
-                selectedServerId = id,
+                // Never override a server the user explicitly selected.
+                selectedServerId = if (it.selectedServerId == 0L) id else it.selectedServerId,
                 defaultServerSeeded = true,
                 seededKeyHash = currentHash
             )

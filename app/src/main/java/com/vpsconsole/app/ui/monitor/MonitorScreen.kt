@@ -164,7 +164,11 @@ fun MonitorScreen(serverId: Long) {
                 )
                 serverRules.forEach { rule ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                        Text("${rule.kind} ≥ ${percent(rule.threshold)}", Modifier.weight(1f))
+                        Text(
+                            "${rule.kind} ≥ ${percent(rule.threshold)}" +
+                                if (rule.isServerThreshold) " (server default)" else "",
+                            Modifier.weight(1f)
+                        )
                         Text(
                             if (rule.enabled) "on" else "off",
                             style = MaterialTheme.typography.labelSmall,

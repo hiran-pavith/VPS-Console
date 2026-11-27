@@ -154,6 +154,7 @@ fun ServerEditScreen(serverId: Long, onSaved: () -> Unit, onCancel: () -> Unit) 
             secret.takeIf { it.isNotBlank() },
             passphrase.takeIf { it.isNotBlank() }
         )
+        container.alertRepo.syncServerThresholdRules(server.copy(id = id))
         container.settings.update { settings ->
             if (settings.selectedServerId == 0L) settings.copy(selectedServerId = id) else settings
         }
