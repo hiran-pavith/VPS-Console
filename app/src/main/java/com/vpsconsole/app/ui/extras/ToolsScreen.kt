@@ -19,7 +19,6 @@ import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Usb
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -47,7 +46,7 @@ private val tools = listOf(
     ToolItem("Packages", "updates and upgrades", Icons.Filled.SystemUpdate, Routes::packages),
     ToolItem("Backups", "remote snapshots", Icons.Filled.Backup, Routes::backups),
     ToolItem("SSH tunnels", "local and remote forwarding", Icons.Filled.Tune, Routes::tunnels),
-    ToolItem("ADB console", "reverse ports, shell, logs, files", Icons.Filled.Usb, Routes::adb),
+    ToolItem("ADB console", "reverse ports, shell, logs, files", Icons.Filled.Computer, Routes::adb),
     ToolItem("Command library", "saved snippets", Icons.Filled.Terminal, Routes::scripts)
 )
 

@@ -14,7 +14,6 @@ import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
-import androidx.compose.material.icons.filled.Usb
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -72,7 +71,7 @@ private val navItems = listOf(
     NavItem("servers", "Servers", Icons.Filled.Computer) { Routes.SERVERS },
     NavItem("terminal", "Terminal", Icons.Filled.Terminal) { Routes.terminal(it) },
     NavItem("tools", "Tools", Icons.Filled.Build) { Routes.tools(it) },
-    NavItem("adb", "ADB", Icons.Filled.Usb) { Routes.adb(it) },
+    NavItem("adb", "ADB", Icons.Filled.Computer) { Routes.adb(it) },
     NavItem("settings", "Settings", Icons.Filled.Settings) { Routes.SETTINGS }
 )
 
