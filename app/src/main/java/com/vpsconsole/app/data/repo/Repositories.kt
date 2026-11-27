@@ -56,6 +56,9 @@ class ServerRepository(
 
     suspend fun touch(id: Long, time: Long) = dao.updateLastConnected(id, time)
 
+    suspend fun updateHostKeyFingerprint(id: Long, fingerprint: String) =
+        dao.updateHostKeyFingerprint(id, fingerprint)
+
     suspend fun secretFor(server: ServerProfile): String? =
         server.secretRef.takeIf { it.isNotBlank() }?.let(secrets::get)
 

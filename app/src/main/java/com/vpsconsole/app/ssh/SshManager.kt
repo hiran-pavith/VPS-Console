@@ -130,6 +130,7 @@ class SshManager(
         val policy = settings.settings.value.hostKeyPolicy
         val keepAliveSeconds = settings.settings.value.keepAliveSeconds
         val known = knownHostRepo.forHost(server.host, server.port)
+        var verifiedFingerprint: String? = null
 
         val result = synchronized(lockFor(serverId)) {
             val current = handles[serverId]
@@ -152,6 +153,7 @@ class SshManager(
                     override fun verify(hostname: String?, port: Int, key: PublicKey?): Boolean {
                         if (key == null) return false
                         val fingerprint = SecurityUtils.getFingerprint(key)
+                        verifiedFingerprint = fingerprint
                         val algorithm = key.algorithm ?: "UNKNOWN"
                         val trusted = known.firstOrNull { it.algorithm == algorithm }
                         if (trusted != null) return trusted.fingerprint == fingerprint
@@ -188,7 +190,12 @@ class SshManager(
                 setState(serverId, ConnectionState.FAILED, error.message ?: "Connection failed")
             }
         }
-        if (result.isSuccess) runCatching { serverRepo.touch(serverId, System.currentTimeMillis()) }
+        if (result.isSuccess) {
+            runCatching { serverRepo.touch(serverId, System.currentTimeMillis()) }
+            verifiedFingerprint?.let { fingerprint ->
+                runCatching { serverRepo.updateHostKeyFingerprint(serverId, fingerprint) }
+            }
+        }
         result
     }
 

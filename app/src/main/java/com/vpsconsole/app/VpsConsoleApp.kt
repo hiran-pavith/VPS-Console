@@ -3,10 +3,8 @@ package com.vpsconsole.app
 import android.app.Application
 import android.util.Log
 import com.vpsconsole.app.worker.MonitorWorker
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import net.schmizz.sshj.common.SecurityUtils
 
 class VpsConsoleApp : Application() {
@@ -16,8 +14,6 @@ class VpsConsoleApp : Application() {
 
     lateinit var container: AppContainer
         private set
-
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
         super.onCreate()
@@ -30,11 +26,12 @@ class VpsConsoleApp : Application() {
             Log.e(TAG, "Failed to register SpongyCastle JCE provider; SSH may fail on this device")
         }
         container = AppContainer(this)
+        // Seed before the UI is created so a background write cannot overwrite
+        // a server the user just selected or edited.
+        runCatching {
+            runBlocking(Dispatchers.IO) { container.seedDefaultServerIfNeeded() }
+        }.onFailure { Log.e(TAG, "Failed to seed default server", it) }
         MonitorWorker.schedule(this)
-        appScope.launch {
-            runCatching { container.seedDefaultServerIfNeeded() }
-                .onFailure { Log.e(TAG, "Failed to seed default server", it) }
-        }
     }
 
     override fun onTerminate() {

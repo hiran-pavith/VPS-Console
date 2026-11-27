@@ -40,6 +40,9 @@ interface ServerDao {
 
     @Query("UPDATE servers SET lastConnectedAt = :time WHERE id = :id")
     suspend fun updateLastConnected(id: Long, time: Long)
+
+    @Query("UPDATE servers SET hostKeyFingerprint = :fingerprint WHERE id = :id")
+    suspend fun updateHostKeyFingerprint(id: Long, fingerprint: String)
 }
 
 @Dao

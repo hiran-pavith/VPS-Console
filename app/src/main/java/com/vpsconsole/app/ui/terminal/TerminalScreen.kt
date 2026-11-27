@@ -58,10 +58,14 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
     var reconnectKey by remember { mutableIntStateOf(0) }
     var reconnectAttempts by remember { mutableIntStateOf(0) }
     var suppressReconnect by remember(serverId) { mutableStateOf(false) }
+    // A shell can finish starting after this screen has been disposed; never
+    // publish such a shell, or it would keep running with no collector.
+    var sessionActive by remember(serverId) { mutableStateOf(true) }
     val scroll = rememberScrollState()
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(serverId, reconnectKey) {
+        sessionActive = true
         suppressReconnect = false
         status = "Connecting…"
         val connect = container.ssh.connect(serverId)
@@ -77,6 +81,10 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
             return@LaunchedEffect
         }
         val session = result.getOrThrow()
+        if (!sessionActive) {
+            session.close()
+            return@LaunchedEffect
+        }
         shell = session
         reconnectAttempts = 0
         status = "Connected"
@@ -116,7 +124,11 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
     }
 
     DisposableEffect(serverId) {
-        onDispose { container.ssh.closeShell(serverId) }
+        sessionActive = true
+        onDispose {
+            sessionActive = false
+            container.ssh.closeShell(serverId)
+        }
     }
 
     LaunchedEffect(rendered) {
