@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.vpsconsole.app.data.model.CommandEntity
 import com.vpsconsole.app.data.model.TunnelEntity
 import com.vpsconsole.app.data.model.TunnelType
+import com.vpsconsole.app.ssh.SftpStreams
 import com.vpsconsole.app.ui.LocalAppContainer
 import com.vpsconsole.app.ui.components.ConfirmDialog
 import com.vpsconsole.app.ui.components.SectionCard
@@ -42,7 +43,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.schmizz.sshj.sftp.SFTPClient
-import java.io.File
+import java.io.IOException
 
 @Composable
 fun BackupsScreen(serverId: Long) {
@@ -69,13 +70,11 @@ fun BackupsScreen(serverId: Long) {
         downloadTarget = null
         if (uri != null && name != null) {
             scope.launch {
-                val cache = File(context.cacheDir, "backup-${System.currentTimeMillis()}.tar.gz")
                 val result = container.ssh.withSftp(serverId) { sftp: SFTPClient ->
-                    sftp.get(joinPath(destination, name), cache.absolutePath)
-                }
-                if (result.isSuccess) {
                     withContext(Dispatchers.IO) {
-                        context.contentResolver.openOutputStream(uri)?.use { it.write(cache.readBytes()) }
+                        val stream = context.contentResolver.openOutputStream(uri)
+                            ?: throw IOException("Cannot open the destination file")
+                        stream.use { SftpStreams.download(sftp, joinPath(destination, name), it) }
                     }
                 }
                 output = result.exceptionOrNull()?.message ?: "Downloaded $name"

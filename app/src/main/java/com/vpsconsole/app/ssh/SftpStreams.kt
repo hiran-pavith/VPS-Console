@@ -17,7 +17,7 @@ object SftpStreams {
 
     fun upload(input: InputStream, sftp: SFTPClient, remotePath: String) {
         val modes = EnumSet.of(OpenMode.WRITE, OpenMode.CREAT, OpenMode.TRUNC)
-        val remote = sftp.sftpEngine.open(remotePath, modes)
+        val remote = sftp.getSFTPEngine().open(remotePath, modes)
         remote.use { file ->
             val buffer = ByteArray(CHUNK_SIZE)
             var offset = 0L
@@ -32,7 +32,7 @@ object SftpStreams {
     }
 
     fun download(sftp: SFTPClient, remotePath: String, output: OutputStream) {
-        val remote = sftp.sftpEngine.open(remotePath, EnumSet.of(OpenMode.READ))
+        val remote = sftp.getSFTPEngine().open(remotePath, EnumSet.of(OpenMode.READ))
         remote.use { file ->
             val buffer = ByteArray(CHUNK_SIZE)
             var offset = 0L

@@ -50,6 +50,7 @@ fun SettingsScreen() {
     val knownHosts by container.knownHostRepo.hosts.collectAsState(emptyList())
     val scope = rememberCoroutineScope()
     var showPinDialog by remember { mutableStateOf(false) }
+    var pinDialogForEnable by remember { mutableStateOf(false) }
     var pinInput by remember { mutableStateOf("") }
     var pinConfirm by remember { mutableStateOf("") }
     var pinError by remember { mutableStateOf<String?>(null) }
@@ -192,11 +193,16 @@ fun SettingsScreen() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             SwitchRow("App lock (PIN / biometrics)", settings.lockEnabled) { enabled ->
-                if (enabled && !container.secrets.isPinConfigured()) showPinDialog = true
-                else container.settings.update { it.copy(lockEnabled = enabled) }
+                if (enabled && !container.secrets.isPinConfigured()) {
+                    pinDialogForEnable = true
+                    showPinDialog = true
+                } else container.settings.update { it.copy(lockEnabled = enabled) }
             }
             if (container.secrets.isPinConfigured()) {
-                OutlinedButton(onClick = { showPinDialog = true }) { Text("Change PIN") }
+                OutlinedButton(onClick = {
+                    pinDialogForEnable = false
+                    showPinDialog = true
+                }) { Text("Change PIN") }
             }
             Text("Auto-lock after ${settings.autoLockMinutes} minutes")
             Slider(
@@ -332,7 +338,9 @@ fun SettingsScreen() {
                         pinInput != pinConfirm -> pinError = "PINs do not match"
                         else -> {
                             container.secrets.setPin(pinInput)
-                            container.settings.update { it.copy(lockEnabled = true) }
+                            if (pinDialogForEnable) {
+                                container.settings.update { it.copy(lockEnabled = true) }
+                            }
                             pinInput = ""; pinConfirm = ""; pinError = null; showPinDialog = false
                         }
                     }
