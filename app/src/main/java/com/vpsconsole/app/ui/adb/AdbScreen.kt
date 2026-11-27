@@ -151,19 +151,29 @@ private fun AdbScreenBody(serverId: Long) {
         }
     }
 
-    LaunchedEffect(serverId, config) {
-        portOutput = listOf(
-            adb.devices(config).adbOutput(),
-            "--- reverse ---\n${adb.reverseList(config).adbOutput()}",
-            "--- forward ---\n${adb.forwardList(config).adbOutput()}"
-        ).joinToString("\n\n")
+    LaunchedEffect(serverId, config, server?.id) {
+        if (server == null) {
+            portOutput = "Select a valid server first."
+            return@LaunchedEffect
+        }
+        runCatching {
+            portOutput = listOf(
+                adb.devices(config).adbOutput(),
+                "--- reverse ---\n${adb.reverseList(config).adbOutput()}",
+                "--- forward ---\n${adb.forwardList(config).adbOutput()}"
+            ).joinToString("\n\n")
+        }.onFailure { error ->
+            portOutput = "Error: ${error.message ?: "ADB host unavailable"}"
+        }
     }
 
-    LaunchedEffect(liveLogs, config) {
-        if (!liveLogs) return@LaunchedEffect
+    LaunchedEffect(liveLogs, config, server?.id) {
+        if (!liveLogs || server == null) return@LaunchedEffect
         while (liveLogs) {
             val lines = logLines.toIntOrNull()?.coerceIn(20, 2000) ?: 300
-            logOutput = adb.logcat(config, lines).adbOutput()
+            runCatching { adb.logcat(config, lines).adbOutput() }
+                .onSuccess { logOutput = it }
+                .onFailure { logOutput = "Error: ${it.message ?: "ADB host unavailable"}" }
             delay(2_000)
         }
     }
@@ -237,6 +247,11 @@ private fun AdbScreenBody(serverId: Long) {
                 }.getOrElse { "Save failed: ${it.message}" }
             }
         }
+    }
+
+    if (server == null) {
+        EmptyState("Select a valid server before opening the ADB console.")
+        return
     }
 
     Column(
