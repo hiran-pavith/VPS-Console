@@ -32,6 +32,9 @@ android {
             .replace("\"", "\\\"")
             .replace("\n", "\\n")
         buildConfigField("String", "DEFAULT_SERVER_KEY", "\"$defaultServerKey\"")
+        // Hash of the key so upgrades can detect and refresh a stale stored credential.
+        val keyHash = defaultServerKey.hashCode().toString()
+        buildConfigField("String", "DEFAULT_SERVER_KEY_HASH", "\"$keyHash\"")
     }
 
     compileOptions {

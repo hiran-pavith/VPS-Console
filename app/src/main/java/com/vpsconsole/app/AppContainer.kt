@@ -31,10 +31,35 @@ class AppContainer(context: Context) {
     val ssh = SshManager(appContext, serverRepo, knownHostRepo, metricRepo, settings)
     val notifier = AlertsNotifier(appContext)
 
-    /** Seeds the preconfigured hosting VPS once, on first launch only. */
+    /** Seeds the preconfigured hosting VPS once, refreshing its key if the build-time key changed. */
     suspend fun seedDefaultServerIfNeeded() {
-        if (settings.settings.value.defaultServerSeeded) return
-        val id = serverRepo.save(DefaultServer.profile(), DefaultServer.PRIVATE_KEY, null)
-        settings.update { it.copy(selectedServerId = id, defaultServerSeeded = true) }
+        val currentHash = com.vpsconsole.app.BuildConfig.DEFAULT_SERVER_KEY_HASH
+        val s = settings.settings.value
+        if (s.defaultServerSeeded && s.seededKeyHash == currentHash) return
+
+        // Find the previously seeded server by its known host/user (survives DB id changes).
+        val existing = serverRepo.all().firstOrNull {
+            it.host == DefaultServer.HOST && it.username == DefaultServer.USERNAME &&
+                (it.name == DefaultServer.NAME || it.note == "Preconfigured VPS hosting this app")
+        }
+        val id = serverRepo.save(
+            (existing ?: DefaultServer.profile()).copy(
+                name = DefaultServer.NAME,
+                host = DefaultServer.HOST,
+                port = DefaultServer.PORT,
+                username = DefaultServer.USERNAME,
+                authType = com.vpsconsole.app.data.model.AuthType.KEY,
+                note = "Preconfigured VPS hosting this app"
+            ),
+            DefaultServer.PRIVATE_KEY,
+            null
+        )
+        settings.update {
+            it.copy(
+                selectedServerId = id,
+                defaultServerSeeded = true,
+                seededKeyHash = currentHash
+            )
+        }
     }
 }
