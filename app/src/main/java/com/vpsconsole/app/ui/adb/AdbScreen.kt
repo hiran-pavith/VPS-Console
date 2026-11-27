@@ -3,6 +3,7 @@ package com.vpsconsole.app.ui.adb
 import android.annotation.SuppressLint
 import android.graphics.BitmapFactory
 import android.util.Base64
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -44,6 +45,7 @@ import com.vpsconsole.app.adb.AdbManager
 import com.vpsconsole.app.adb.adbOutput
 import com.vpsconsole.app.ssh.SftpStreams
 import com.vpsconsole.app.ui.LocalAppContainer
+import com.vpsconsole.app.ui.components.EmptyState
 import com.vpsconsole.app.ui.components.SectionCard
 import com.vpsconsole.app.ui.extras.OutputBox
 import kotlinx.coroutines.Dispatchers
@@ -54,11 +56,33 @@ import java.io.IOException
 
 private val adbTabs = listOf("Ports", "Shell", "Apps", "Logs", "Input", "Files", "Info", "Host")
 
-@SuppressLint("SdCardPath")
 @Composable
 fun AdbScreen(serverId: Long) {
+    var fatal by remember(serverId) { mutableStateOf<String?>(null) }
+    if (fatal != null) {
+        Column(
+            Modifier.fillMaxSize().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("ADB screen error", style = MaterialTheme.typography.headlineSmall)
+            Text(fatal.orEmpty(), style = MaterialTheme.typography.bodySmall)
+            Button(onClick = { fatal = null }) { Text("Retry") }
+        }
+        return
+    }
+    runCatching { AdbScreenBody(serverId) }.onFailure { error ->
+        Log.e("AdbScreen", "ADB screen failed", error)
+        fatal = error.message ?: "Unknown error"
+    }
+}
+
+@SuppressLint("SdCardPath")
+@Composable
+private fun AdbScreenBody(serverId: Long) {
     val container = LocalAppContainer.current
     val context = LocalContext.current
+    val servers by container.serverRepo.servers.collectAsState(emptyList())
+    val server = servers.firstOrNull { it.id == serverId }
     val settings by container.settings.settings.collectAsState()
     val scope = rememberCoroutineScope()
     val adb = remember(serverId) { AdbManager(container.ssh, serverId) }
