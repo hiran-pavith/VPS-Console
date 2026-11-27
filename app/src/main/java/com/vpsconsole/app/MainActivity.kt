@@ -48,7 +48,7 @@ class MainActivity : FragmentActivity() {
                 mutableStateOf(settings.lockEnabled && container.secrets.isPinConfigured())
             }
 
-            VpsConsoleTheme(settings.themeMode) {
+            VpsConsoleTheme(settings.themeMode, settings.accentColor) {
                 CompositionLocalProvider(LocalAppContainer provides container) {
                     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                         if (locked) {

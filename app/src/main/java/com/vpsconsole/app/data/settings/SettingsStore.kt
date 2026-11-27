@@ -23,7 +23,19 @@ data class AppSettings(
     val metricHistoryHours: Int = 24,
     val confirmDangerousCommands: Boolean = true,
     val defaultServerSeeded: Boolean = false,
-    val seededKeyHash: String = ""
+    val seededKeyHash: String = "",
+    // Customizations
+    val accentColor: String = "blue",
+    val terminalColorScheme: String = "default",
+    val serverSortOrder: String = "name",
+    val dashboardCompact: Boolean = false,
+    val sftpDefaultPath: String = "home",
+    val sftpCustomPath: String = "/home",
+    val showCpuGauge: Boolean = true,
+    val showRamGauge: Boolean = true,
+    val showDiskGauge: Boolean = true,
+    val showNetworkGauge: Boolean = true,
+    val notificationSound: Boolean = true
 )
 
 class SettingsStore(context: Context) {
@@ -51,7 +63,18 @@ class SettingsStore(context: Context) {
         metricHistoryHours = prefs.getInt(HISTORY_HOURS, 24).coerceIn(1, 168),
         confirmDangerousCommands = prefs.getBoolean(CONFIRM_DANGEROUS, true),
         defaultServerSeeded = prefs.getBoolean(DEFAULT_SERVER_SEEDED, false),
-        seededKeyHash = prefs.getString(SEEDED_KEY_HASH, "") ?: ""
+        seededKeyHash = prefs.getString(SEEDED_KEY_HASH, "") ?: "",
+        accentColor = prefs.getString(ACCENT_COLOR, "blue") ?: "blue",
+        terminalColorScheme = prefs.getString(TERMINAL_SCHEME, "default") ?: "default",
+        serverSortOrder = prefs.getString(SERVER_SORT, "name") ?: "name",
+        dashboardCompact = prefs.getBoolean(DASHBOARD_COMPACT, false),
+        sftpDefaultPath = prefs.getString(SFTP_DEFAULT_PATH, "home") ?: "home",
+        sftpCustomPath = prefs.getString(SFTP_CUSTOM_PATH, "/home") ?: "/home",
+        showCpuGauge = prefs.getBoolean(SHOW_CPU_GAUGE, true),
+        showRamGauge = prefs.getBoolean(SHOW_RAM_GAUGE, true),
+        showDiskGauge = prefs.getBoolean(SHOW_DISK_GAUGE, true),
+        showNetworkGauge = prefs.getBoolean(SHOW_NETWORK_GAUGE, true),
+        notificationSound = prefs.getBoolean(NOTIFICATION_SOUND, true)
     )
 
     fun update(transform: (AppSettings) -> AppSettings) {
@@ -73,6 +96,17 @@ class SettingsStore(context: Context) {
             putBoolean(CONFIRM_DANGEROUS, next.confirmDangerousCommands)
             putBoolean(DEFAULT_SERVER_SEEDED, next.defaultServerSeeded)
             putString(SEEDED_KEY_HASH, next.seededKeyHash)
+            putString(ACCENT_COLOR, next.accentColor)
+            putString(TERMINAL_SCHEME, next.terminalColorScheme)
+            putString(SERVER_SORT, next.serverSortOrder)
+            putBoolean(DASHBOARD_COMPACT, next.dashboardCompact)
+            putString(SFTP_DEFAULT_PATH, next.sftpDefaultPath)
+            putString(SFTP_CUSTOM_PATH, next.sftpCustomPath)
+            putBoolean(SHOW_CPU_GAUGE, next.showCpuGauge)
+            putBoolean(SHOW_RAM_GAUGE, next.showRamGauge)
+            putBoolean(SHOW_DISK_GAUGE, next.showDiskGauge)
+            putBoolean(SHOW_NETWORK_GAUGE, next.showNetworkGauge)
+            putBoolean(NOTIFICATION_SOUND, next.notificationSound)
         }.apply()
         _settings.value = next
     }
@@ -98,5 +132,16 @@ class SettingsStore(context: Context) {
         const val CONFIRM_DANGEROUS = "confirm_dangerous"
         const val DEFAULT_SERVER_SEEDED = "default_server_seeded"
         const val SEEDED_KEY_HASH = "seeded_key_hash"
+        const val ACCENT_COLOR = "accent_color"
+        const val TERMINAL_SCHEME = "terminal_color_scheme"
+        const val SERVER_SORT = "server_sort_order"
+        const val DASHBOARD_COMPACT = "dashboard_compact"
+        const val SFTP_DEFAULT_PATH = "sftp_default_path"
+        const val SFTP_CUSTOM_PATH = "sftp_custom_path"
+        const val SHOW_CPU_GAUGE = "show_cpu_gauge"
+        const val SHOW_RAM_GAUGE = "show_ram_gauge"
+        const val SHOW_DISK_GAUGE = "show_disk_gauge"
+        const val SHOW_NETWORK_GAUGE = "show_network_gauge"
+        const val NOTIFICATION_SOUND = "notification_sound"
     }
 }

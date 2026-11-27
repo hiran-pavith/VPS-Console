@@ -38,6 +38,8 @@ import com.vpsconsole.app.data.model.HostKeyPolicy
 import com.vpsconsole.app.ui.LocalAppContainer
 import com.vpsconsole.app.ui.components.ConfirmDialog
 import com.vpsconsole.app.ui.components.SectionCard
+import com.vpsconsole.app.ui.theme.AccentTheme
+import com.vpsconsole.app.ui.theme.TerminalScheme
 import kotlinx.coroutines.launch
 
 @Composable
