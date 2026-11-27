@@ -56,7 +56,17 @@ class TunnelService : Service() {
             ACTION_START -> {
                 if (!running) {
                     running = true
-                    startForeground()
+                    try {
+                        startForeground()
+                    } catch (e: Exception) {
+                        // Foreground start can fail on API 34+ if the notification
+                        // channel/type is rejected. Never let that crash the app.
+                        TunnelState.status.value = "Error: notification failed — ${e.message}"
+                        TunnelState.log("Foreground start failed: ${e.message}")
+                        running = false
+                        stopSelf()
+                        return START_NOT_STICKY
+                    }
                     TunnelState.log("Starting reverse tunnel")
                     scope.launch { runTunnel() }
                 }
@@ -75,7 +85,11 @@ class TunnelService : Service() {
         running = false
         cleanup()
         scope.cancel()
-        TunnelState.status.value = "Stopped"
+        // Do not hide a failure by replacing it with "Stopped" — the user needs
+        // to see why the tunnel closed.
+        if (!TunnelState.status.value.startsWith("Error")) {
+            TunnelState.status.value = "Stopped"
+        }
         super.onDestroy()
     }
 
@@ -87,12 +101,18 @@ class TunnelService : Service() {
         val sshPort = config.port.trim().toIntOrNull() ?: 22
         val keepAlive = config.keepAlive.trim().toIntOrNull()?.coerceIn(5, 120) ?: 30
 
-        if (config.host.isBlank() || config.username.isBlank() ||
-            remotePort == null || remotePort !in 1..65535 ||
-            targetPort == null || targetPort !in 1..65535
-        ) {
-            TunnelState.status.value = "Error: invalid configuration"
-            TunnelState.log("Check host, username, remote port and target port")
+        val configError = when {
+            config.host.isBlank() -> "server host is empty"
+            config.username.isBlank() -> "SSH username is empty"
+            remotePort == null || remotePort !in 1..65535 -> "remote port must be 1-65535"
+            targetPort == null || targetPort !in 1..65535 -> "target port must be 1-65535"
+            config.authType == "KEY" && config.privateKey.isBlank() -> "private key is empty"
+            config.authType == "PASSWORD" && config.password.isBlank() -> "password is empty"
+            else -> null
+        }
+        if (configError != null) {
+            TunnelState.status.value = "Error: $configError"
+            TunnelState.log("Configuration error: $configError")
             running = false
             stopSelf()
             return
@@ -123,6 +143,7 @@ class TunnelService : Service() {
                 })
 
                 ssh.connect(config.host.trim(), sshPort)
+                TunnelState.log("SSH TCP connection established")
                 ssh.connection.keepAlive.keepAliveInterval = keepAlive
 
                 if (config.authType == "KEY") {
@@ -134,6 +155,7 @@ class TunnelService : Service() {
                     ssh.authPassword(config.username.trim(), config.password)
                 }
                 if (!ssh.isAuthenticated) throw IllegalStateException("Authentication failed")
+                TunnelState.log("Authenticated as ${config.username.trim()}")
 
                 val bindHost = config.remoteBindHost.trim()
                 val fwd = if (bindHost.isEmpty()) {
@@ -147,6 +169,7 @@ class TunnelService : Service() {
                 )
                 forward = fwd
                 connected = true
+                TunnelState.log("Remote port $remotePort bound")
 
                 val displayBind = if (bindHost.isEmpty()) "localhost" else bindHost
                 TunnelState.status.value =
@@ -159,8 +182,9 @@ class TunnelService : Service() {
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                TunnelState.status.value = "Error: ${e.message ?: "tunnel failed"}"
-                TunnelState.log("Tunnel error: ${e.message ?: e.javaClass.simpleName}")
+                val detail = e.message ?: e.javaClass.simpleName
+                TunnelState.status.value = "Error: $detail"
+                TunnelState.log("Tunnel error [${e.javaClass.simpleName}]: $detail")
             } finally {
                 if (connected) TunnelState.log("Tunnel disconnected")
                 cleanup()
@@ -171,7 +195,11 @@ class TunnelService : Service() {
             delay(5_000)
         }
 
-        TunnelState.status.value = "Stopped"
+        if (!TunnelState.status.value.startsWith("Error") &&
+            !TunnelState.status.value.startsWith("Retrying")
+        ) {
+            TunnelState.status.value = "Stopped"
+        }
         stopSelf()
     }
 
