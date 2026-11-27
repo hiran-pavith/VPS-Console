@@ -85,6 +85,31 @@ private val navItems = listOf(
 fun AppRoot() {
     val nav = rememberNavController()
     val container = LocalAppContainer.current
+    val context = LocalContext.current
+    var crashText by remember { mutableStateOf(CrashReport.last) }
+    if (crashText != null) {
+        AlertDialog(
+            onDismissRequest = {
+                CrashReport.clear(context)
+                crashText = null
+            },
+            title = { Text("Last app crash") },
+            text = {
+                Text(
+                    text = crashText.orEmpty(),
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    fontFamily = FontFamily.Monospace,
+                    style = androidx.compose.material3.MaterialTheme.typography.bodySmall
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    CrashReport.clear(context)
+                    crashText = null
+                }) { Text("Clear") }
+            }
+        )
+    }
     val servers by container.serverRepo.servers.collectAsState(emptyList())
     val settings by container.settings.settings.collectAsState()
     val backStack by nav.currentBackStackEntryAsState()
