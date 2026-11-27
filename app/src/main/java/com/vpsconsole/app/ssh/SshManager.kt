@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.common.SecurityUtils
@@ -68,6 +69,14 @@ class SshManager(
     private val activeTunnels = ConcurrentHashMap<Long, ActiveTunnel>()
     private val lastMetrics = ConcurrentHashMap<Long, MetricEntity>()
     private val collector = MetricsCollector()
+
+    /** Number of in-flight exec/SFTP/probe operations per server. */
+    private val inFlight = ConcurrentHashMap<Long, Int>()
+    private fun markBusy(serverId: Long) { inFlight.compute(serverId) { _, n -> (n ?: 0) + 1 } }
+    private fun markIdle(serverId: Long) {
+        inFlight.compute(serverId) { _, n -> if (n == null || n <= 1) null else n - 1 }
+    }
+    private fun isBusy(serverId: Long) = (inFlight[serverId] ?: 0) > 0
 
     /** Per-server lock serializing connect/close/collect/shell state mutations. */
     private val serverLocks = ConcurrentHashMap<Long, Any>()
@@ -203,11 +212,11 @@ class SshManager(
         }
     }
 
-    /** Close all idle connections, but keep sessions with a live shell or tunnel. */
+    /** Close all idle connections, but never interrupt a live shell, tunnel, or transfer. */
     fun closeAll() {
         val busyServers = activeTunnels.values.map { it.serverId }.toSet()
         handles.keys.toList().forEach { id ->
-            if (id in busyServers) return@forEach
+            if (id in busyServers || isBusy(id)) return@forEach
             val handle = handles[id]
             if (handle?.shell?.closed?.value == false) return@forEach
             close(id)
