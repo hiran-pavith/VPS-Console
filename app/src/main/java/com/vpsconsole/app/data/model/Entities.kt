@@ -1,5 +1,6 @@
 package com.vpsconsole.app.data.model
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -61,7 +62,9 @@ data class AlertRuleEntity(
     val threshold: Float,
     val enabled: Boolean = true,
     val cooldownMinutes: Int = 15,
-    val lastTriggeredAt: Long = 0L
+    val lastTriggeredAt: Long = 0L,
+    /** True for rules auto-created from the per-server monitoring thresholds. */
+    @ColumnInfo(name = "isServerThreshold") val isServerThreshold: Boolean = false
 )
 
 @Entity(tableName = "alert_events")
