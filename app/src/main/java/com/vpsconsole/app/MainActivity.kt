@@ -14,13 +14,14 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.core.app.ActivityCompat
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.vpsconsole.app.ui.LocalAppContainer
 import com.vpsconsole.app.ui.LockScreen
 import com.vpsconsole.app.ui.navigation.AppRoot
@@ -31,9 +32,14 @@ class MainActivity : FragmentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { /* granted or denied; notifications simply remain off if denied */ }
 
+    private val lockedState = mutableStateOf(false)
+    private var backgroundedAt = 0L
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val container = (application as VpsConsoleApp).container
+        val settingsAtStart = container.settings.settings.value
+        lockedState.value = settingsAtStart.lockEnabled && container.secrets.isPinConfigured()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
@@ -44,9 +50,7 @@ class MainActivity : FragmentActivity() {
 
         setContent {
             val settings by container.settings.settings.collectAsState()
-            var locked by rememberSaveable {
-                mutableStateOf(settings.lockEnabled && container.secrets.isPinConfigured())
-            }
+            var locked by lockedState
 
             VpsConsoleTheme(settings.themeMode, settings.accentColor) {
                 CompositionLocalProvider(LocalAppContainer provides container) {
@@ -63,6 +67,23 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
+
+        // Auto-lock after the configured idle period in the background.
+        lifecycle.addObserver(LifecycleEventObserver { _, event ->
+            val settingsNow = container.settings.settings.value
+            when (event) {
+                Lifecycle.Event.ON_STOP -> backgroundedAt = System.currentTimeMillis()
+                Lifecycle.Event.ON_START -> {
+                    val startedAt = backgroundedAt
+                    backgroundedAt = 0L
+                    if (startedAt > 0L && settingsNow.lockEnabled && container.secrets.isPinConfigured()) {
+                        val idleMinutes = (System.currentTimeMillis() - startedAt) / 60_000L
+                        if (idleMinutes >= settingsNow.autoLockMinutes) lockedState.value = true
+                    }
+                }
+                else -> Unit
+            }
+        })
     }
 
     private fun unlockBiometric(onSuccess: () -> Unit) {

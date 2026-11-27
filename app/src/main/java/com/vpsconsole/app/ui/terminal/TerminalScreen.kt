@@ -55,10 +55,12 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
     var shell by remember(serverId) { mutableStateOf<ShellSession?>(null) }
     val history = remember { mutableStateListOf<String>() }
     var historyIndex by remember { mutableIntStateOf(0) } // history.size = no selection
+    var reconnectKey by remember { mutableIntStateOf(0) }
+    var reconnectAttempts by remember { mutableIntStateOf(0) }
     val scroll = rememberScrollState()
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(serverId) {
+    LaunchedEffect(serverId, reconnectKey) {
         status = "Connecting…"
         val connect = container.ssh.connect(serverId)
         if (connect.isFailure) {
@@ -74,6 +76,7 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
         }
         val session = result.getOrThrow()
         shell = session
+        reconnectAttempts = 0
         status = "Connected"
         buffer.append("[SSH session ready]\r\n")
         rendered = buffer.text
@@ -93,7 +96,13 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
             }
             launch {
                 session.closed.collect { isClosed ->
-                    if (isClosed && !status.startsWith("Error")) status = "Disconnected"
+                    if (!isClosed) return@collect
+                    if (!status.startsWith("Error")) status = "Disconnected"
+                    if (settings.autoReconnect && reconnectAttempts < 5) {
+                        reconnectAttempts++
+                        kotlinx.coroutines.delay(2_000)
+                        reconnectKey++
+                    }
                 }
             }
         }
