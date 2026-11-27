@@ -11,6 +11,7 @@ import com.vpsconsole.app.data.model.AlertRuleEntity
 import com.vpsconsole.app.data.model.CommandEntity
 import com.vpsconsole.app.data.model.KnownHostEntity
 import com.vpsconsole.app.data.model.MetricEntity
+import com.vpsconsole.app.data.model.NoteEntity
 import com.vpsconsole.app.data.model.ServerProfile
 import com.vpsconsole.app.data.model.TunnelEntity
 import kotlinx.coroutines.flow.Flow
@@ -112,6 +113,33 @@ interface CommandDao {
 
     @Query("SELECT * FROM commands WHERE serverId = 0 OR serverId = :serverId ORDER BY useCount DESC")
     fun observeFor(serverId: Long): Flow<List<CommandEntity>>
+
+    @Query("SELECT * FROM commands")
+    suspend fun all(): List<CommandEntity>
+}
+
+@Dao
+interface NoteDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(note: NoteEntity): Long
+
+    @Update
+    suspend fun update(note: NoteEntity)
+
+    @Delete
+    suspend fun delete(note: NoteEntity)
+
+    @Query("SELECT * FROM notes ORDER BY updatedAt DESC")
+    fun observeAll(): Flow<List<NoteEntity>>
+
+    @Query("SELECT * FROM notes WHERE serverId = 0 OR serverId = :serverId ORDER BY updatedAt DESC")
+    fun observeFor(serverId: Long): Flow<List<NoteEntity>>
+
+    @Query("SELECT * FROM notes")
+    suspend fun all(): List<NoteEntity>
+
+    @Query("SELECT * FROM notes WHERE id = :id")
+    suspend fun get(id: Long): NoteEntity?
 }
 
 @Dao

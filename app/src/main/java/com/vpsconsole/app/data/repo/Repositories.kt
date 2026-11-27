@@ -4,6 +4,7 @@ import com.vpsconsole.app.data.db.AlertDao
 import com.vpsconsole.app.data.db.CommandDao
 import com.vpsconsole.app.data.db.KnownHostDao
 import com.vpsconsole.app.data.db.MetricDao
+import com.vpsconsole.app.data.db.NoteDao
 import com.vpsconsole.app.data.db.ServerDao
 import com.vpsconsole.app.data.db.TunnelDao
 import com.vpsconsole.app.data.model.AlertEventEntity
@@ -12,6 +13,7 @@ import com.vpsconsole.app.data.model.CommandEntity
 import com.vpsconsole.app.data.model.KnownHostEntity
 import com.vpsconsole.app.data.model.MetricEntity
 import com.vpsconsole.app.data.model.MetricKind
+import com.vpsconsole.app.data.model.NoteEntity
 import com.vpsconsole.app.data.model.ServerProfile
 import com.vpsconsole.app.data.model.TunnelEntity
 import com.vpsconsole.app.data.secure.SecretsStore
@@ -125,6 +127,8 @@ class CommandRepository(private val dao: CommandDao) {
 
     fun forServer(serverId: Long): Flow<List<CommandEntity>> = dao.observeFor(serverId)
 
+    suspend fun all(): List<CommandEntity> = dao.all()
+
     suspend fun save(command: CommandEntity) {
         if (command.id == 0L) dao.insert(command) else dao.update(command)
     }
@@ -152,4 +156,23 @@ class TunnelRepository(private val dao: TunnelDao) {
     suspend fun save(tunnel: TunnelEntity): Long = dao.insert(tunnel.copy(id = 0))
 
     suspend fun delete(tunnel: TunnelEntity) = dao.delete(tunnel)
+}
+
+class NoteRepository(private val dao: NoteDao) {
+    val notes: Flow<List<NoteEntity>> = dao.observeAll()
+
+    fun forServer(serverId: Long): Flow<List<NoteEntity>> = dao.observeFor(serverId)
+
+    suspend fun all(): List<NoteEntity> = dao.all()
+
+    suspend fun get(id: Long): NoteEntity? = dao.get(id)
+
+    suspend fun save(note: NoteEntity): Long =
+        if (note.id == 0L) dao.insert(note.copy(id = 0, updatedAt = System.currentTimeMillis()))
+        else {
+            dao.update(note.copy(updatedAt = System.currentTimeMillis()))
+            note.id
+        }
+
+    suspend fun delete(note: NoteEntity) = dao.delete(note)
 }
