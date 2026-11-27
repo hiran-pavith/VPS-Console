@@ -17,6 +17,11 @@
 -keep class com.vpsconsole.app.data.db.** { *; }
 -keep class com.vpsconsole.app.adb.** { *; }
 -keep class com.vpsconsole.app.ui.adb.** { *; }
+-keep class com.vpsconsole.app.auth.** { *; }
+-keep class com.vpsconsole.app.sync.** { *; }
+-keep class com.vpsconsole.app.ui.auth.** { *; }
+-keep class com.vpsconsole.app.ui.notes.** { *; }
+-keep class com.vpsconsole.app.ui.sync.** { *; }
 -keep class org.bouncycastle.jce.provider.BouncyCastleProvider { *; }
 -keep class org.bouncycastle.** { *; }
 -keep class org.spongycastle.jce.provider.BouncyCastleProvider { *; }

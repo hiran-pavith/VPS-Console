@@ -31,12 +31,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.vpsconsole.app.core.formatTimestamp
 import com.vpsconsole.app.data.model.HostKeyPolicy
 import com.vpsconsole.app.ui.LocalAppContainer
+import com.vpsconsole.app.ui.components.BusyIndicator
 import com.vpsconsole.app.ui.components.ConfirmDialog
 import com.vpsconsole.app.ui.components.LabeledField
 import com.vpsconsole.app.ui.components.SectionCard
@@ -45,10 +47,12 @@ import com.vpsconsole.app.ui.theme.TerminalScheme
 import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(onOpenSync: () -> Unit = {}) {
     val container = LocalAppContainer.current
+    val context = LocalContext.current
     val settings by container.settings.settings.collectAsState()
     val knownHosts by container.knownHostRepo.hosts.collectAsState(emptyList())
+    val authState by container.auth.state.collectAsState()
     val scope = rememberCoroutineScope()
     var showPinDialog by remember { mutableStateOf(false) }
     var pinDialogForEnable by remember { mutableStateOf(false) }
@@ -61,6 +65,28 @@ fun SettingsScreen() {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        SectionCard(title = "Account & Sync") {
+            Text(
+                when {
+                    authState.isGoogle -> authState.email.ifBlank { authState.displayName }
+                    authState.hasSession -> "Local device session"
+                    else -> "Not signed in"
+                },
+                style = MaterialTheme.typography.titleMedium
+            )
+            if (authState.message.isNotBlank()) {
+                Text(authState.message, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { container.auth.startGoogleLogin(context) }) {
+                    Text(if (authState.isGoogle) "Switch Google account" else "Sign in with Google")
+                }
+                OutlinedButton(onClick = onOpenSync) { Text("Sync") }
+            }
+            if (authState.isLoading) BusyIndicator()
+        }
+
         SectionCard(title = "Appearance · Theme") {
             Text("Mode", style = MaterialTheme.typography.bodyMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

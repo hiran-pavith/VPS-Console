@@ -1,6 +1,7 @@
 package com.vpsconsole.app
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -22,10 +23,13 @@ import androidx.core.app.ActivityCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.lifecycleScope
 import com.vpsconsole.app.ui.LocalAppContainer
 import com.vpsconsole.app.ui.LockScreen
+import com.vpsconsole.app.ui.auth.LoginScreen
 import com.vpsconsole.app.ui.navigation.AppRoot
 import com.vpsconsole.app.ui.theme.VpsConsoleTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
     companion object {
@@ -45,6 +49,9 @@ class MainActivity : FragmentActivity() {
         val settingsAtStart = container.settings.settings.value
         lockedState.value = savedInstanceState?.getBoolean(KEY_LOCKED)
             ?: (settingsAtStart.lockEnabled && container.secrets.isPinConfigured())
+        intent.data?.let { uri ->
+            lifecycleScope.launch { container.auth.handleRedirect(uri) }
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
@@ -55,18 +62,19 @@ class MainActivity : FragmentActivity() {
 
         setContent {
             val settings by container.settings.settings.collectAsState()
+            val authState by container.auth.state.collectAsState()
             var locked by lockedState
 
             VpsConsoleTheme(settings.themeMode, settings.accentColor) {
                 CompositionLocalProvider(LocalAppContainer provides container) {
                     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                        if (locked) {
-                            LockScreen(
+                        when {
+                            !authState.hasSession -> LoginScreen()
+                            locked -> LockScreen(
                                 onPinSuccess = { locked = false },
                                 onBiometric = { unlockBiometric { locked = false } }
                             )
-                        } else {
-                            AppRoot()
+                            else -> AppRoot()
                         }
                     }
                 }
@@ -89,6 +97,14 @@ class MainActivity : FragmentActivity() {
                 else -> Unit
             }
         })
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        intent.data?.let { uri ->
+            lifecycleScope.launch { (application as VpsConsoleApp).container.auth.handleRedirect(uri) }
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
