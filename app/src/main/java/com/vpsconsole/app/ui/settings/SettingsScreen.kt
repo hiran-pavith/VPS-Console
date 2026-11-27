@@ -299,12 +299,16 @@ fun SettingsScreen() {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            LabeledField("adb binary / path", settings.adbBinary) {
-                container.settings.update { s -> s.copy(adbBinary = it) }
-            }
-            LabeledField("Device serial (optional)", settings.adbSerial) {
-                container.settings.update { s -> s.copy(adbSerial = it) }
-            }
+            LabeledField(
+                label = "adb binary / path",
+                value = settings.adbBinary,
+                onValueChange = { container.settings.update { s -> s.copy(adbBinary = it) } }
+            )
+            LabeledField(
+                label = "Device serial (optional)",
+                value = settings.adbSerial,
+                onValueChange = { container.settings.update { s -> s.copy(adbSerial = it) } }
+            )
             Text("Command timeout: ${settings.adbTimeoutSeconds}s")
             Slider(
                 value = settings.adbTimeoutSeconds.toFloat(),

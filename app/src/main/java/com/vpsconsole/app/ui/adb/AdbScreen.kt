@@ -144,8 +144,8 @@ fun AdbScreen(serverId: Long) {
             try {
                 val target = devicePath.trim()
                 val hostTemp = "/tmp/vps-console-adb-push-${System.currentTimeMillis()}"
-                val message = runCatching {
-                    withContext(Dispatchers.IO) {
+                val message = runCatching<String> {
+                    withContext<Unit>(Dispatchers.IO) {
                         val stream = context.contentResolver.openInputStream(uri)
                             ?: throw IOException("Cannot open the selected file")
                         stream.use { input ->
@@ -172,9 +172,9 @@ fun AdbScreen(serverId: Long) {
             try {
                 val source = devicePath.trim()
                 val hostTemp = "/tmp/vps-console-adb-pull-${System.currentTimeMillis()}"
-                val message = runCatching {
+                val message = runCatching<String> {
                     val pulled = adb.pull(config, source, hostTemp).getOrThrow()
-                    withContext(Dispatchers.IO) {
+                    withContext<Unit>(Dispatchers.IO) {
                         val stream = context.contentResolver.openOutputStream(uri)
                             ?: throw IOException("Cannot open the destination file")
                         stream.use { output ->
@@ -197,10 +197,11 @@ fun AdbScreen(serverId: Long) {
         val bytes = screenshotBytes ?: return@rememberLauncherForActivityResult
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            screenshotOutput = withContext(Dispatchers.IO) {
-                runCatching {
-                    context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+            screenshotOutput = withContext<String>(Dispatchers.IO) {
+                runCatching<String> {
+                    val stream = context.contentResolver.openOutputStream(uri)
                         ?: throw IOException("Cannot open the destination file")
+                    stream.use { it.write(bytes) }
                     "Screenshot saved"
                 }.getOrElse { "Save failed: ${it.message}" }
             }
