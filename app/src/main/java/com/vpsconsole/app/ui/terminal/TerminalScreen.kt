@@ -159,7 +159,7 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
         repeat(change.backspaces) { current.write("\u007F") }
         if (change.added.isNotEmpty()) current.write(change.added)
         if (change.added.contains('\n')) {
-            val line = (input + change.added).trimEnd('\n', '\r')
+            val line = next.trimEnd('\n', '\r')
             if (line.isNotBlank()) {
                 history.add(line)
                 historyIndex = history.size
@@ -167,6 +167,37 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
             input = ""
         } else {
             input = next
+        }
+    }
+
+    /** In direct mode the characters are already in the PTY; only Enter is left. */
+    fun submitInput() {
+        if (directTyping) {
+            if (input.isNotEmpty()) {
+                shell?.write("\n")
+                input = ""
+            }
+        } else {
+            send(input.ifEndsWithNewline())
+            input = ""
+        }
+    }
+
+    fun runSavedCommand(command: String) {
+        if (directTyping) input = ""
+        send(command.ifEndsWithNewline())
+    }
+
+    fun recallHistory(index: Int) {
+        val line = history.getOrNull(index).orEmpty()
+        historyIndex = index
+        if (directTyping) {
+            // Clear the current shell line, then place the recalled command there.
+            shell?.write("\u0015")
+            if (line.isNotEmpty()) shell?.write(line)
+            input = line
+        } else {
+            input = line
         }
     }
 
@@ -223,28 +254,20 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
             modifier = Modifier.fillMaxWidth().focusRequester(inputFocus),
             singleLine = true,
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Send),
-            keyboardActions = androidx.compose.foundation.text.KeyboardActions(
-                onSend = {
-                    send(input.ifEndsWithNewline())
-                    input = ""
-                }
-            ),
+            keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSend = { submitInput() }),
             trailingIcon = {
-                IconButton(onClick = {
-                    send(input.ifEndsWithNewline())
-                    input = ""
-                }) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send") }
+                IconButton(onClick = { submitInput() }) {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
+                }
             }
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = {
-                historyIndex = if (history.isEmpty()) 0 else (historyIndex - 1).coerceAtLeast(0)
-                input = history.getOrNull(historyIndex).orEmpty()
+                recallHistory(if (history.isEmpty()) 0 else (historyIndex - 1).coerceAtLeast(0))
             }, modifier = Modifier.weight(1f)) { Text("History ↑") }
             Button(onClick = {
-                historyIndex = (historyIndex + 1).coerceAtMost(history.size)
-                input = history.getOrNull(historyIndex).orEmpty()
+                recallHistory((historyIndex + 1).coerceAtMost(history.size))
             }, modifier = Modifier.weight(1f)) { Text("History ↓") }
         }
 
@@ -268,7 +291,7 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
                 commands.take(12).forEach { command ->
                     OutlinedButton(onClick = {
                         scope.launch { container.commandRepo.markUsed(command) }
-                        send(command.command.ifEndsWithNewline())
+                        runSavedCommand(command.command)
                     }) { Text(command.title) }
                 }
             }

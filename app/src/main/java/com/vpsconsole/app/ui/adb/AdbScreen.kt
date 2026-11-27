@@ -498,7 +498,7 @@ fun AdbScreen(serverId: Long) {
                 OutputBox(fileOutput, Modifier.heightIn(min = 160.dp))
             }
 
-            else -> SectionCard(title = "Device info") {
+            6 -> SectionCard(title = "Device info") {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = {
                         runAdb({ adb.deviceInfo(config) }) { infoOutput = it }
@@ -509,6 +509,79 @@ fun AdbScreen(serverId: Long) {
                 }
                 OutputBox(infoOutput, Modifier.heightIn(min = 220.dp))
                 OutputBox(processOutput, Modifier.heightIn(min = 220.dp))
+            }
+
+            else -> SectionCard(title = "ADB host service") {
+                Text(
+                    "Control the adb server on the VPS and attach wireless devices. " +
+                        "Start the server before using the other tabs.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = {
+                        runAdb({ adb.startServer(config) }) { hostOutput = it }
+                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Start server") }
+                    OutlinedButton(onClick = {
+                        runAdb({ adb.version(config) }) { hostOutput = it }
+                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Version") }
+                    OutlinedButton(onClick = {
+                        runAdb({ adb.devices(config) }) { hostOutput = it }
+                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Devices") }
+                    OutlinedButton(onClick = {
+                        runAdb({ adb.killServer(config) }) { hostOutput = it }
+                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Kill server") }
+                }
+                OutlinedTextField(
+                    value = hostTarget, onValueChange = { hostTarget = it },
+                    label = { Text("Device host:port or serial") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
+                OutlinedTextField(
+                    value = pairCode, onValueChange = { pairCode = it },
+                    label = { Text("Pairing code (Wireless debugging)") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = {
+                        if (hostTarget.isNotBlank()) runAdb({ adb.connect(config, hostTarget.trim()) }) { hostOutput = it }
+                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Connect") }
+                    OutlinedButton(onClick = {
+                        if (hostTarget.isNotBlank()) runAdb({ adb.disconnect(config, hostTarget.trim()) }) { hostOutput = it }
+                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Disconnect") }
+                    OutlinedButton(onClick = {
+                        if (hostTarget.isNotBlank() && pairCode.isNotBlank()) {
+                            runAdb({ adb.pair(config, hostTarget.trim(), pairCode.trim()) }) { hostOutput = it }
+                        } else hostOutput = "Enter a host:port and pairing code"
+                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Pair") }
+                }
+                OutlinedTextField(
+                    value = tcpipPort, onValueChange = { tcpipPort = it },
+                    label = { Text("TCP/IP port") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = {
+                        val port = tcpipPort.toIntOrNull()
+                        if (port != null) runAdb({ adb.tcpip(config, port) }) { hostOutput = it }
+                        else hostOutput = "Enter a numeric port"
+                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("TCP/IP") }
+                    OutlinedButton(onClick = {
+                        runAdb({ adb.root(config) }) { hostOutput = it }
+                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Root") }
+                    OutlinedButton(onClick = {
+                        runAdb({ adb.unroot(config) }) { hostOutput = it }
+                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Unroot") }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = {
+                        runAdb({ adb.reboot(config) }) { hostOutput = it }
+                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Reboot") }
+                    OutlinedButton(onClick = {
+                        runAdb({ adb.reboot(config, "bootloader") }) { hostOutput = it }
+                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Bootloader") }
+                }
+                OutputBox(hostOutput, Modifier.heightIn(min = 200.dp))
             }
         }
     }
