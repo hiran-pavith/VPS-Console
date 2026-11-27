@@ -35,6 +35,21 @@ android {
         // Hash of the key so upgrades can detect and refresh a stale stored credential.
         val keyHash = defaultServerKey.hashCode().toString()
         buildConfigField("String", "DEFAULT_SERVER_KEY_HASH", "\"$keyHash\"")
+
+        // Google OAuth client for login and Drive appDataFolder sync.
+        // These are read from the gitignored local.properties file. The client
+        // secret is optional; installed apps rely primarily on PKCE.
+        fun buildString(value: String) =
+            "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + "\""
+        val googleClientId = localProps.getProperty("VPS_CONSOLE_GOOGLE_CLIENT_ID", "")
+        val googleClientSecret = localProps.getProperty("VPS_CONSOLE_GOOGLE_CLIENT_SECRET", "")
+        val googleRedirectUri = localProps.getProperty(
+            "VPS_CONSOLE_GOOGLE_REDIRECT_URI",
+            "com.vpsconsole.app:/oauth2redirect"
+        )
+        buildConfigField("String", "GOOGLE_CLIENT_ID", buildString(googleClientId))
+        buildConfigField("String", "GOOGLE_CLIENT_SECRET", buildString(googleClientSecret))
+        buildConfigField("String", "GOOGLE_REDIRECT_URI", buildString(googleRedirectUri))
     }
 
     compileOptions {

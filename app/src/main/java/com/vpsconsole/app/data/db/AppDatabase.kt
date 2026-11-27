@@ -12,6 +12,7 @@ import com.vpsconsole.app.data.model.AlertRuleEntity
 import com.vpsconsole.app.data.model.CommandEntity
 import com.vpsconsole.app.data.model.KnownHostEntity
 import com.vpsconsole.app.data.model.MetricEntity
+import com.vpsconsole.app.data.model.NoteEntity
 import com.vpsconsole.app.data.model.ServerProfile
 import com.vpsconsole.app.data.model.TunnelEntity
 
@@ -23,9 +24,10 @@ import com.vpsconsole.app.data.model.TunnelEntity
         AlertEventEntity::class,
         CommandEntity::class,
         KnownHostEntity::class,
-        TunnelEntity::class
+        TunnelEntity::class,
+        NoteEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

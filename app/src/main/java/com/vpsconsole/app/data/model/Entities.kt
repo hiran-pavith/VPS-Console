@@ -110,3 +110,14 @@ data class TunnelEntity(
     val remoteBindHost: String = "",
     val createdAt: Long = System.currentTimeMillis()
 )
+
+@Entity(tableName = "notes")
+data class NoteEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val title: String,
+    val body: String = "",
+    val tags: String = "",
+    val serverId: Long = 0,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)
