@@ -64,10 +64,12 @@ import com.vpsconsole.app.ui.extras.TunnelsScreen
 import com.vpsconsole.app.ui.extras.UsersScreen
 import com.vpsconsole.app.ui.files.FilesScreen
 import com.vpsconsole.app.ui.monitor.MonitorScreen
+import com.vpsconsole.app.ui.notes.NotesScreen
 import com.vpsconsole.app.ui.servers.ServerEditScreen
 import com.vpsconsole.app.ui.servers.ServerListScreen
 import com.vpsconsole.app.ui.services.ServicesScreen
 import com.vpsconsole.app.ui.settings.SettingsScreen
+import com.vpsconsole.app.ui.sync.SyncScreen
 import com.vpsconsole.app.ui.terminal.TerminalScreen
 
 private data class NavItem(val base: String, val label: String, val icon: ImageVector, val target: (Long) -> String)
@@ -195,6 +197,8 @@ private fun AppScaffold(
                                         route.startsWith("monitor") -> Routes.monitor(server.id)
                                         route.startsWith("services") -> Routes.services(server.id)
                                         route.startsWith("files") -> Routes.files(server.id)
+                                        route.startsWith("commands") -> Routes.commands(server.id)
+                                        route.startsWith("scripts") -> Routes.scripts(server.id)
                                         route.startsWith("adb") -> Routes.adb(server.id)
                                         else -> null
                                     }
@@ -260,6 +264,9 @@ private fun titleFor(route: String): String = when {
     route.startsWith("backups") -> "Backups"
     route.startsWith("tunnels") -> "SSH Tunnels"
     route.startsWith("scripts") -> "Command Library"
+    route.startsWith("commands") -> "Command Library"
+    route.startsWith("notes") -> "Notes"
+    route.startsWith("sync") -> "Account & Sync"
     route.startsWith("adb") -> "ADB Console"
     else -> "VPS Console"
 }
@@ -313,7 +320,7 @@ private fun AppNavGraph(nav: NavHostController, modifier: Modifier) {
         composable(Routes.TOOLS, arguments = longArg) { entry ->
             ToolsScreen(entry.arguments?.getLong("serverId") ?: 0L) { nav.navigate(it) }
         }
-        composable(Routes.SETTINGS) { SettingsScreen() }
+        composable(Routes.SETTINGS) { SettingsScreen(onOpenSync = { nav.navigate(Routes.SYNC) }) }
         composable(Routes.FIREWALL, arguments = longArg) { entry ->
             FirewallScreen(entry.arguments?.getLong("serverId") ?: 0L)
         }
@@ -335,6 +342,11 @@ private fun AppNavGraph(nav: NavHostController, modifier: Modifier) {
         composable(Routes.SCRIPTS, arguments = longArg) { entry ->
             ScriptsScreen(entry.arguments?.getLong("serverId") ?: 0L)
         }
+        composable(Routes.COMMANDS, arguments = longArg) { entry ->
+            ScriptsScreen(entry.arguments?.getLong("serverId") ?: 0L)
+        }
+        composable(Routes.NOTES) { NotesScreen() }
+        composable(Routes.SYNC) { SyncScreen() }
         composable(Routes.ADB, arguments = longArg) { entry ->
             AdbScreen(entry.arguments?.getLong("serverId") ?: 0L)
         }

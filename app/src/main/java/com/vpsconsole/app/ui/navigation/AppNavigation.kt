@@ -19,6 +19,9 @@ object Routes {
     const val TUNNELS = "tunnels/{serverId}"
     const val SCRIPTS = "scripts/{serverId}"
     const val ADB = "adb/{serverId}"
+    const val COMMANDS = "commands/{serverId}"
+    const val NOTES = "notes"
+    const val SYNC = "sync"
 
     fun serverEdit(id: Long = 0L) = "server_edit/$id"
     fun terminal(id: Long) = "terminal/$id"
@@ -33,5 +36,6 @@ object Routes {
     fun backups(id: Long) = "backups/$id"
     fun tunnels(id: Long) = "tunnels/$id"
     fun scripts(id: Long) = "scripts/$id"
+    fun commands(id: Long) = "commands/$id"
     fun adb(id: Long) = "adb/$id"
 }

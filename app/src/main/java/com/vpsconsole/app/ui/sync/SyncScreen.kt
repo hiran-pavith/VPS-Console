@@ -57,7 +57,7 @@ fun SyncScreen() {
                 val payload = container.sync.exportEncrypted(passphrase).getOrThrow()
                 container.sync.writeToFile(uri, payload).getOrThrow()
                 "Encrypted sync file saved"
-            }.onFailure { status = "Export failed: ${fail(it)}" }.getOrDefault(status)
+            }.getOrElse { "Export failed: ${fail(it)}" }
             busy = false
         }
     }
@@ -72,7 +72,7 @@ fun SyncScreen() {
                 val payload = container.sync.readFromFile(uri).getOrThrow()
                 val summary = container.sync.importEncrypted(payload, passphrase).getOrThrow()
                 summary.toString()
-            }.onFailure { status = "Import failed: ${fail(it)}" }.getOrDefault(status)
+            }.getOrElse { "Import failed: ${fail(it)}" }
             busy = false
         }
     }
@@ -155,7 +155,7 @@ fun SyncScreen() {
                             val payload = container.sync.exportEncrypted(passphrase).getOrThrow()
                             val id = container.sync.uploadToGoogle(payload).getOrThrow()
                             "Uploaded encrypted sync file (Drive id $id)"
-                        }.onFailure { status = "Upload failed: ${fail(it)}" }.getOrDefault(status)
+                        }.getOrElse { "Upload failed: ${fail(it)}" }
                         busy = false
                     }
                 },
@@ -168,7 +168,7 @@ fun SyncScreen() {
                         busy = true
                         status = runCatching {
                             container.sync.downloadFromGoogle(passphrase).getOrThrow().toString()
-                        }.onFailure { status = "Download failed: ${fail(it)}" }.getOrDefault(status)
+                        }.getOrElse { "Download failed: ${fail(it)}" }
                         busy = false
                     }
                 },
