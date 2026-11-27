@@ -54,6 +54,7 @@ fun ServerListScreen(
 ) {
     val container = LocalAppContainer.current
     val servers by container.serverRepo.servers.collectAsState(emptyList())
+    val settings by container.settings.settings.collectAsState()
     val states by container.ssh.states.collectAsState(emptyMap())
     var query by remember { mutableStateOf("") }
     var group by remember { mutableStateOf("All") }
@@ -61,7 +62,12 @@ fun ServerListScreen(
     val scope = rememberCoroutineScope()
 
     val groups = listOf("All") + servers.map { it.group }.filter { it.isNotBlank() }.distinct().sorted()
-    val visible = servers.filter { server ->
+    val sorted = when (settings.serverSortOrder) {
+        "host" -> servers.sortedBy { it.host }
+        "group" -> servers.sortedWith(compareBy({ it.group }, { it.name }))
+        else -> servers.sortedBy { it.name }
+    }
+    val visible = sorted.filter { server ->
         (group == "All" || server.group == group) &&
             (query.isBlank() || listOf(server.name, server.host, server.username, server.group)
                 .any { it.contains(query, ignoreCase = true) })

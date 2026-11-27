@@ -97,23 +97,24 @@ fun MonitorScreen(serverId: Long) {
         }
         item {
             SectionCard(title = "Live metrics") {
+                val accent = com.vpsconsole.app.ui.theme.AccentTheme.from(settings.accentColor)
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    CircleGauge(
+                    if (settings.showCpuGauge) CircleGauge(
                         label = "CPU", valueText = percent(latest?.cpu ?: 0f),
                         fraction = (latest?.cpu ?: 0f) / 100f,
-                        color = Color(0xFF58A6FF),
+                        color = Color(accent.dark),
                         modifier = Modifier.weight(1f)
                     )
-                    CircleGauge(
+                    if (settings.showRamGauge) CircleGauge(
                         label = "RAM", valueText = percent(latest?.ram ?: 0f),
                         fraction = (latest?.ram ?: 0f) / 100f,
-                        color = Color(0xFF3FB950),
+                        color = Color(accent.secondaryDark),
                         modifier = Modifier.weight(1f)
                     )
-                    CircleGauge(
+                    if (settings.showDiskGauge) CircleGauge(
                         label = "Disk", valueText = percent(latest?.disk ?: 0f),
                         fraction = (latest?.disk ?: 0f) / 100f,
                         color = Color(0xFFD29922),
@@ -131,16 +132,16 @@ fun MonitorScreen(serverId: Long) {
                         caption = "uptime ${formatUptime(latest?.uptimeSec ?: 0)}",
                         modifier = Modifier.weight(1f)
                     )
-                    CircleGauge(
+                    if (settings.showNetworkGauge) CircleGauge(
                         label = "↓ Rx", valueText = formatRate(latest?.rxMbps ?: 0f),
                         fraction = networkFraction(latest?.rxMbps ?: 0f, latest?.txMbps ?: 0f),
-                        color = Color(0xFF58A6FF),
+                        color = Color(accent.dark),
                         modifier = Modifier.weight(1f)
                     )
-                    CircleGauge(
+                    if (settings.showNetworkGauge) CircleGauge(
                         label = "↑ Tx", valueText = formatRate(latest?.txMbps ?: 0f),
                         fraction = networkFraction(latest?.txMbps ?: 0f, latest?.rxMbps ?: 0f),
-                        color = Color(0xFF3FB950),
+                        color = Color(accent.secondaryDark),
                         modifier = Modifier.weight(1f)
                     )
                 }
