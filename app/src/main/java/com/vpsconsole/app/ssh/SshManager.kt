@@ -168,9 +168,17 @@ class SshManager(
     fun close(serverId: Long) {
         val handle = handles.remove(serverId)
         runCatching { handle?.shell?.close() }
+        if (handle != null) handle.shell = null
         runCatching { handle?.client?.disconnect() }
         activeTunnels.filter { it.value.serverId == serverId }.keys.forEach(::stopTunnel)
         setState(serverId, ConnectionState.DISCONNECTED)
+    }
+
+    /** Close just the interactive shell, keeping the SSH connection. */
+    fun closeShell(serverId: Long) {
+        val handle = handles[serverId] ?: return
+        runCatching { handle.shell?.close() }
+        handle.shell = null
     }
 
     fun closeAll() {
@@ -212,7 +220,11 @@ class SshManager(
             ensureConnected(serverId)
             val handle = handles[serverId]
                 ?: throw IllegalStateException("SSH connection is not available")
-            handle.shell?.takeIf { !it.closed.value }?.let { return@runCatching it }
+            handle.shell?.let { existing ->
+                if (!existing.closed.value) return@runCatching existing
+                runCatching { existing.close() }
+                handle.shell = null
+            }
             val session = ShellSession(handle.client)
             handle.shell = session
             session

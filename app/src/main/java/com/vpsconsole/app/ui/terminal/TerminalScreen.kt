@@ -23,6 +23,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -51,7 +52,7 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
     var rendered by remember(serverId) { mutableStateOf("") }
     var input by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("Disconnected") }
-    var shell by remember { mutableStateOf<ShellSession?>(null) }
+    var shell by remember(serverId) { mutableStateOf<ShellSession?>(null) }
     val history = remember { mutableStateListOf<String>() }
     var historyIndex by remember { mutableIntStateOf(-1) }
     val scroll = rememberScrollState()
@@ -74,18 +75,36 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
         val session = result.getOrThrow()
         shell = session
         status = "Connected"
-        buffer.append("\r\n[SSH session ready]\r\n")
+        buffer.append("[SSH session ready]\r\n")
         rendered = buffer.text
-        session.output.collect { chunk ->
-            buffer.append(chunk)
-            rendered = buffer.text
+        kotlinx.coroutines.coroutineScope {
+            launch {
+                session.output.collect { chunk ->
+                    buffer.append(chunk)
+                    rendered = buffer.text
+                }
+            }
+            launch {
+                session.errors.collect { msg ->
+                    buffer.append("\r\n[error] $msg\r\n")
+                    rendered = buffer.text
+                    status = "Error: $msg"
+                }
+            }
+            launch {
+                session.closed.collect { isClosed ->
+                    if (isClosed && !status.startsWith("Error")) status = "Disconnected"
+                }
+            }
         }
-        status = "Disconnected"
-        shell = null
+    }
+
+    DisposableEffect(serverId) {
+        onDispose { container.ssh.closeShell(serverId) }
     }
 
     LaunchedEffect(rendered) {
-        if (scroll.maxValue > 0) scroll.animateScrollTo(scroll.maxValue)
+        if (scroll.maxValue > 0) scroll.scrollTo(scroll.maxValue)
     }
 
     fun send(text: String, appendHistory: Boolean = true) {

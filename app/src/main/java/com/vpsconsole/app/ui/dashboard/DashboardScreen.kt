@@ -45,6 +45,8 @@ fun DashboardScreen(
 ) {
     val container = LocalAppContainer.current
     val servers by container.serverRepo.servers.collectAsState(emptyList())
+    val settings by container.settings.settings.collectAsState()
+    val compact = settings.dashboardCompact
     val states by container.ssh.states.collectAsState(emptyMap())
     val events by container.alertRepo.events.collectAsState(emptyList())
     val scope = rememberCoroutineScope()

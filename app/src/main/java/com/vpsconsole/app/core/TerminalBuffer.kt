@@ -3,9 +3,14 @@ package com.vpsconsole.app.core
 /**
  * Small terminal text buffer: strips ANSI escape sequences, handles carriage
  * returns and backspaces so interactive shell output stays readable.
+ *
+ * PTYs translate '\n' into "\r\n". A bare '\r' means "return cursor to column
+ * zero" (overwrite the current line), but "\r\n" is just a newline and must
+ * NOT erase the line. A pending flag handles CRLF pairs split across reads.
  */
 class TerminalBuffer(private val maxChars: Int = 40_000) {
     private val sb = StringBuilder()
+    private var pendingCR = false
 
     var version: Int = 0
         private set
@@ -15,7 +20,19 @@ class TerminalBuffer(private val maxChars: Int = 40_000) {
     fun append(chunk: String) {
         var i = 0
         while (i < chunk.length) {
-            when (chunk[i]) {
+            val c = chunk[i]
+            // Resolve a CR that was the last char of a previous chunk.
+            if (pendingCR) {
+                pendingCR = false
+                if (c == '\n') {
+                    sb.append('\n')
+                    i++
+                    continue
+                }
+                // Bare CR: truncate current line (cursor home).
+                truncateToLineStart()
+            }
+            when (c) {
                 ESC -> {
                     i = when {
                         i + 1 < chunk.length && chunk[i + 1] == '[' -> skipCsi(chunk, i + 2)
@@ -25,9 +42,18 @@ class TerminalBuffer(private val maxChars: Int = 40_000) {
                 }
 
                 '\r' -> {
-                    val lineStart = sb.lastIndexOf("\n")
-                    sb.setLength(if (lineStart >= 0) lineStart + 1 else 0)
-                    i++
+                    if (i + 1 < chunk.length) {
+                        if (chunk[i + 1] == '\n') {
+                            sb.append('\n')
+                            i += 2
+                        } else {
+                            truncateToLineStart()
+                            i++
+                        }
+                    } else {
+                        pendingCR = true
+                        i++
+                    }
                 }
 
                 '\b' -> {
@@ -36,7 +62,7 @@ class TerminalBuffer(private val maxChars: Int = 40_000) {
                 }
 
                 else -> {
-                    sb.append(chunk[i])
+                    sb.append(c)
                     i++
                 }
             }
@@ -45,8 +71,14 @@ class TerminalBuffer(private val maxChars: Int = 40_000) {
         version++
     }
 
+    private fun truncateToLineStart() {
+        val lineStart = sb.lastIndexOf("\n")
+        sb.setLength(if (lineStart >= 0) lineStart + 1 else 0)
+    }
+
     fun clear() {
         sb.setLength(0)
+        pendingCR = false
         version++
     }
 

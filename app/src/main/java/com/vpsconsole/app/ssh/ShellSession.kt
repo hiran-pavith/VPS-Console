@@ -4,6 +4,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -17,8 +18,16 @@ class ShellSession(client: SSHClient) {
     private val shell: Session.Shell = session.startShell()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    val output = MutableSharedFlow<String>(extraBufferCapacity = 512)
-    val errors = MutableSharedFlow<String>(extraBufferCapacity = 64)
+    // DROP_OLDEST keeps the freshest terminal text and never silently loses the
+    // newest chunk when the UI is briefly busy rendering.
+    val output = MutableSharedFlow<String>(
+        extraBufferCapacity = 1024,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    val errors = MutableSharedFlow<String>(
+        extraBufferCapacity = 128,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
     val closed = MutableStateFlow(false)
 
     init {
@@ -29,9 +38,9 @@ class ShellSession(client: SSHClient) {
                 while (!closed.value) {
                     val read = reader.read(buffer)
                     if (read < 0) break
-                    if (read > 0) output.tryEmit(String(buffer, 0, read))
+                    if (read > 0) output.emit(String(buffer, 0, read))
                 }
-            }.onFailure { errors.tryEmit(it.message ?: "Shell read failed") }
+            }.onFailure { errors.emit(it.message ?: "Shell read failed") }
             closed.value = true
         }
         scope.launch {
@@ -41,9 +50,9 @@ class ShellSession(client: SSHClient) {
                 while (!closed.value) {
                     val read = reader.read(buffer)
                     if (read < 0) break
-                    if (read > 0) errors.tryEmit(String(buffer, 0, read))
+                    if (read > 0) errors.emit(String(buffer, 0, read))
                 }
-            }
+            }.onFailure { errors.emit(it.message ?: "Shell error read failed") }
         }
     }
 
