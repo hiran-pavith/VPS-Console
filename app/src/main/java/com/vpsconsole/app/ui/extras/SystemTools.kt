@@ -153,7 +153,13 @@ fun CronScreen(serverId: Long) {
             title = "Delete cron job?", text = entries.getOrNull(index)?.raw ?: "",
             confirmLabel = "Delete",
             onConfirm = {
-                scope.launch { write(raw.lines().filter { it.isNotBlank() }.filterIndexed { i, _ -> i != index }) }
+                // Delete by exact line identity, not index — parseCron() skips
+                // comments/blanks so indexes into `entries` and `raw.lines()` diverge.
+                val target = entries.getOrNull(index)?.raw
+                scope.launch {
+                    if (target != null) write(raw.lines().filter { it != target })
+                    pendingDelete = null
+                }
             },
             onDismiss = { pendingDelete = null }
         )

@@ -28,9 +28,12 @@ class MetricsCollector {
         val cpuIdle = (cpuValues.getOrNull(3) ?: 0L) + (cpuValues.getOrNull(4) ?: 0L)
 
         val memText = section("MEM")
-        val memTotal = Regex("MemTotal:\\s*(\\d+)").find(memText)?.groupValues?.get(1)?.toLongOrNull() ?: 1L
-        val memAvailable = Regex("MemAvailable:\\s*(\\d+)").find(memText)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
-        val ram = (100f * (memTotal - memAvailable) / memTotal).coerceIn(0f, 100f)
+        val memTotal = Regex("MemTotal:\\s*(\\d+)").find(memText)?.groupValues?.get(1)
+            ?.toLongOrNull()?.coerceAtLeast(1L) ?: 1L
+        val memAvailable = Regex("MemAvailable:\\s*(\\d+)").find(memText)?.groupValues?.get(1)
+            ?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+        val ramRaw = (100f * (memTotal - memAvailable) / memTotal)
+        val ram = (if (ramRaw.isFinite()) ramRaw else 0f).coerceIn(0f, 100f)
 
         val disk = section("DISK").lines().firstOrNull { it.contains("/") }
             ?.split(Regex("\\s+"))

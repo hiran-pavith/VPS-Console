@@ -54,7 +54,7 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
     var status by remember { mutableStateOf("Disconnected") }
     var shell by remember(serverId) { mutableStateOf<ShellSession?>(null) }
     val history = remember { mutableStateListOf<String>() }
-    var historyIndex by remember { mutableIntStateOf(-1) }
+    var historyIndex by remember { mutableIntStateOf(0) } // history.size = no selection
     val scroll = rememberScrollState()
     val scope = rememberCoroutineScope()
 
@@ -207,7 +207,7 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = {
-                historyIndex = (historyIndex - 1).coerceAtLeast(0)
+                historyIndex = if (history.isEmpty()) 0 else (historyIndex - 1).coerceAtLeast(0)
                 input = history.getOrNull(historyIndex).orEmpty()
             }, modifier = Modifier.weight(1f)) { Text("History ↑") }
             Button(onClick = {
