@@ -63,10 +63,16 @@ class MainActivity : ComponentActivity() {
                         initial = store.load(),
                         onSave = { store.save(it) },
                         onStart = { config ->
-                            store.save(config)
+                            runCatching { store.save(config) }
+                                .onFailure { TunnelState.log("Save failed: ${it.message}") }
                             if (!validate(config)) return@TunnelScreen
                             TunnelState.clearLogs()
-                            TunnelService.start(this)
+                            TunnelState.status.value = "Starting service…"
+                            runCatching { TunnelService.start(this) }
+                                .onFailure { e ->
+                                    TunnelState.status.value = "Error: start failed — ${e.message}"
+                                    TunnelState.log("Start failed [${e.javaClass.simpleName}]: ${e.message}")
+                                }
                         },
                         onStop = { TunnelService.stop(this) }
                     )

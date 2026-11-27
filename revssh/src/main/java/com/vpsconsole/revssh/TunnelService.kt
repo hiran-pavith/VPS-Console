@@ -94,6 +94,23 @@ class TunnelService : Service() {
     }
 
     private suspend fun runTunnel() {
+        try {
+            runTunnelInner()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            // Never let an unexpected exception silently kill the coroutine —
+            // that would look like the tunnel "auto closes" with no explanation.
+            val detail = e.message ?: e.javaClass.simpleName
+            TunnelState.status.value = "Error: $detail"
+            TunnelState.log("Fatal [${e.javaClass.simpleName}]: $detail")
+        } finally {
+            stopSelf()
+        }
+    }
+
+    private suspend fun runTunnelInner() {
+        TunnelState.log("Loading configuration")
         val configStore = ConfigStore(applicationContext)
         val config = configStore.load()
         val remotePort = config.remotePort.trim().toIntOrNull()
@@ -114,7 +131,6 @@ class TunnelService : Service() {
             TunnelState.status.value = "Error: $configError"
             TunnelState.log("Configuration error: $configError")
             running = false
-            stopSelf()
             return
         }
 
@@ -205,7 +221,6 @@ class TunnelService : Service() {
         ) {
             TunnelState.status.value = "Stopped"
         }
-        stopSelf()
     }
 
     private fun cleanup() {
