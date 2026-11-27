@@ -1,6 +1,7 @@
 package com.vpsconsole.app
 
 import android.content.Context
+import com.vpsconsole.app.auth.AuthManager
 import com.vpsconsole.app.core.AlertsNotifier
 import com.vpsconsole.app.data.DefaultServer
 import com.vpsconsole.app.data.db.AppDatabase
@@ -13,6 +14,7 @@ import com.vpsconsole.app.data.repo.TunnelRepository
 import com.vpsconsole.app.data.secure.SecretsStore
 import com.vpsconsole.app.data.settings.SettingsStore
 import com.vpsconsole.app.ssh.SshManager
+import com.vpsconsole.app.sync.SyncManager
 
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
@@ -27,6 +29,10 @@ class AppContainer(context: Context) {
     val commandRepo = CommandRepository(db.commandDao())
     val knownHostRepo = KnownHostRepository(db.knownHostDao())
     val tunnelRepo = TunnelRepository(db.tunnelDao())
+    val noteRepo = NoteRepository(db.noteDao())
+
+    val auth = AuthManager(secrets)
+    val sync = SyncManager(appContext, this, auth)
 
     val ssh = SshManager(appContext, serverRepo, knownHostRepo, metricRepo, settings)
     val notifier = AlertsNotifier(appContext)
