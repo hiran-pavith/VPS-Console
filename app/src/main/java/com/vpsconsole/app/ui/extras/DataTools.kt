@@ -168,9 +168,21 @@ fun TunnelsScreen(serverId: Long) {
                     OutlinedTextField(value = targetHost, onValueChange = { targetHost = it }, label = { Text("Local target host") }, modifier = Modifier.weight(1f), singleLine = true)
                     OutlinedTextField(value = targetPort, onValueChange = { targetPort = it }, label = { Text("Local target port") }, modifier = Modifier.weight(1f), singleLine = true)
                 }
+                OutlinedButton(
+                    onClick = {
+                        type = TunnelType.REMOTE
+                        remotePort = "8080"
+                        remoteBindHost = "127.0.0.1"
+                        targetHost = "127.0.0.1"
+                        targetPort = "8080"
+                        message = "ADB reverse preset loaded: VPS 127.0.0.1:8080 → device 127.0.0.1:8080"
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Use ADB reverse preset") }
                 Text(
                     "Reverse mode forwards a port on the VPS back to a service reachable from this device. " +
-                        "Leave bind address empty to listen on all interfaces (requires GatewayPorts on the server).",
+                        "Leave bind address empty to listen on all interfaces (requires GatewayPorts on the server). " +
+                        "For host-side adb reverse, use the ADB Console tab instead.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
