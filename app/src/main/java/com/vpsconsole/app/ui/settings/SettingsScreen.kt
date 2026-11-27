@@ -38,6 +38,7 @@ import com.vpsconsole.app.core.formatTimestamp
 import com.vpsconsole.app.data.model.HostKeyPolicy
 import com.vpsconsole.app.ui.LocalAppContainer
 import com.vpsconsole.app.ui.components.ConfirmDialog
+import com.vpsconsole.app.ui.components.LabeledField
 import com.vpsconsole.app.ui.components.SectionCard
 import com.vpsconsole.app.ui.theme.AccentTheme
 import com.vpsconsole.app.ui.theme.TerminalScheme
@@ -290,6 +291,27 @@ fun SettingsScreen() {
                     }
                 }
             }
+        }
+
+        SectionCard(title = "ADB host") {
+            Text(
+                "ADB commands execute on this VPS over SSH. Connect the phone to the VPS adb server first.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            LabeledField("adb binary / path", settings.adbBinary) {
+                container.settings.update { s -> s.copy(adbBinary = it) }
+            }
+            LabeledField("Device serial (optional)", settings.adbSerial) {
+                container.settings.update { s -> s.copy(adbSerial = it) }
+            }
+            Text("Command timeout: ${settings.adbTimeoutSeconds}s")
+            Slider(
+                value = settings.adbTimeoutSeconds.toFloat(),
+                onValueChange = { container.settings.update { s -> s.copy(adbTimeoutSeconds = it.toInt()) } },
+                valueRange = 15f..180f,
+                steps = 10
+            )
         }
 
         SectionCard(title = "Data") {
