@@ -7,6 +7,10 @@
 -dontwarn sun.security.**
 -dontwarn org.bouncycastle.jce.provider.X509LDAPCertStoreSpi
 -dontwarn org.bouncycastle.cert.dane.**
+# Google Tink (used by security-crypto) references compile-only annotations.
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn javax.annotation.**
+-dontwarn javax.annotation.concurrent.**
 -keep class net.schmizz.sshj.** { *; }
 -keep class com.hierynomus.sshj.** { *; }
 -keep class com.vpsconsole.app.data.model.** { *; }
