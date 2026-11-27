@@ -69,6 +69,10 @@ class SshManager(
     private val lastMetrics = ConcurrentHashMap<Long, MetricEntity>()
     private val collector = MetricsCollector()
 
+    /** Per-server lock serializing connect/close/collect/shell state mutations. */
+    private val serverLocks = ConcurrentHashMap<Long, Any>()
+    private fun lockFor(serverId: Long): Any = serverLocks.computeIfAbsent(serverId) { Any() }
+
     private val _states = MutableStateFlow<Map<Long, ConnectionState>>(emptyMap())
     val states: StateFlow<Map<Long, ConnectionState>> = _states.asStateFlow()
 
@@ -102,23 +106,30 @@ class SshManager(
     }
 
     suspend fun connect(serverId: Long): Result<Unit> = withContext(Dispatchers.IO) {
-        val current = handles[serverId]
-        if (current != null && current.client.isConnected && current.client.isAuthenticated) {
-            return@withContext Result.success(Unit)
-        }
-        close(serverId)
+        synchronized(lockFor(serverId)) {
+            val current = handles[serverId]
+            if (current != null && current.client.isConnected && current.client.isAuthenticated) {
+                return@synchronized Result.success(Unit)
+            }
+            // Close only the exact stale handle observed; do not stop tunnels —
+            // a reconnect must not tear down the user's active port forwards.
+            if (current != null) {
+                runCatching { current.shell?.close() }
+                runCatching { current.client.disconnect() }
+                handles.remove(serverId, current)
+            }
 
-        val server = serverRepo.get(serverId)
-            ?: return@withContext Result.failure(IllegalArgumentException("Server not found"))
-        val secret = serverRepo.secretFor(server)
-            ?: return@withContext Result.failure(IllegalStateException("No credential stored for this server"))
-        if (secret.isEmpty()) {
-            return@withContext Result.failure(IllegalStateException("No credential stored for this server"))
-        }
+            val server = serverRepo.get(serverId)
+                ?: return@synchronized Result.failure(IllegalArgumentException("Server not found"))
+            val secret = serverRepo.secretFor(server)
+                ?: return@synchronized Result.failure(IllegalStateException("No credential stored for this server"))
+            if (secret.isEmpty()) {
+                return@synchronized Result.failure(IllegalStateException("No credential stored for this server"))
+            }
 
-        setState(serverId, ConnectionState.CONNECTING)
-        val client = SSHClient(AndroidSshConfig())
-        runCatching {
+            setState(serverId, ConnectionState.CONNECTING)
+            val client = SSHClient(AndroidSshConfig())
+            runCatching {
             val policy = settings.settings.value.hostKeyPolicy
             val known = knownHostRepo.forHost(server.host, server.port)
             client.transport.timeoutMs = 30_000
