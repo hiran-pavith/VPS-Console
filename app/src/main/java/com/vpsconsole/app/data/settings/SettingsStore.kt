@@ -37,7 +37,11 @@ data class AppSettings(
     val showNetworkGauge: Boolean = true,
     val notificationSound: Boolean = true,
     val servicesDefaultTab: String = "SERVICES",
-    val processesLimit: Int = 60
+    val processesLimit: Int = 60,
+    // ADB host control (commands execute on the selected VPS over SSH)
+    val adbBinary: String = "adb",
+    val adbSerial: String = "",
+    val adbTimeoutSeconds: Int = 60
 )
 
 class SettingsStore(context: Context) {
@@ -78,7 +82,10 @@ class SettingsStore(context: Context) {
         showNetworkGauge = prefs.getBoolean(SHOW_NETWORK_GAUGE, true),
         notificationSound = prefs.getBoolean(NOTIFICATION_SOUND, true),
         servicesDefaultTab = prefs.getString(SERVICES_DEFAULT_TAB, "SERVICES") ?: "SERVICES",
-        processesLimit = prefs.getInt(PROCESSES_LIMIT, 60).coerceIn(10, 200)
+        processesLimit = prefs.getInt(PROCESSES_LIMIT, 60).coerceIn(10, 200),
+        adbBinary = prefs.getString(ADB_BINARY, "adb")?.takeIf { it.isNotBlank() } ?: "adb",
+        adbSerial = prefs.getString(ADB_SERIAL, "") ?: "",
+        adbTimeoutSeconds = prefs.getInt(ADB_TIMEOUT, 60).coerceIn(15, 180)
     )
 
     fun update(transform: (AppSettings) -> AppSettings) {
@@ -113,6 +120,9 @@ class SettingsStore(context: Context) {
             putBoolean(NOTIFICATION_SOUND, next.notificationSound)
             putString(SERVICES_DEFAULT_TAB, next.servicesDefaultTab)
             putInt(PROCESSES_LIMIT, next.processesLimit)
+            putString(ADB_BINARY, next.adbBinary)
+            putString(ADB_SERIAL, next.adbSerial)
+            putInt(ADB_TIMEOUT, next.adbTimeoutSeconds)
         }.apply()
         _settings.value = next
     }
@@ -151,5 +161,8 @@ class SettingsStore(context: Context) {
         const val NOTIFICATION_SOUND = "notification_sound"
         const val SERVICES_DEFAULT_TAB = "services_default_tab"
         const val PROCESSES_LIMIT = "processes_limit"
+        const val ADB_BINARY = "adb_binary"
+        const val ADB_SERIAL = "adb_serial"
+        const val ADB_TIMEOUT = "adb_timeout_seconds"
     }
 }
