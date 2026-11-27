@@ -190,7 +190,7 @@ fun FilesScreen(serverId: Long) {
                         ) { Text("✎") }
                         IconButton(
                             onClick = {
-                                modeText = item.permissions
+                                modeText = (item.octalMode and 0x1FF).toString(8).padStart(3, '0')
                                 chmodTarget = item
                             },
                             modifier = Modifier.semantics { contentDescription = "Change permissions" }
@@ -291,7 +291,10 @@ fun FilesScreen(serverId: Long) {
             confirmButton = {
                 TextButton(onClick = {
                     val mode = modeText.toIntOrNull(8)
-                    if (mode != null) {
+                    if (mode == null) {
+                        message = "Invalid mode — use octal digits (e.g. 755)"
+                    } else {
+                        message = ""
                         scope.launch {
                             val result = container.ssh.withSftp(serverId) { sftp -> sftp.chmod(file.path, mode) }
                             result.onFailure { message = it.message ?: "chmod failed" }
@@ -370,6 +373,7 @@ private fun listRemote(sftp: SFTPClient, path: String, showHidden: Boolean): Lis
             .map { it.name.replace("USER", "U").replace("GROUP", "G").replace("OTHERS", "O") }
             .joinToString(",")
             .ifEmpty { attrs.getType().name },
+        octalMode = net.schmizz.sshj.xfer.FilePermission.toMask(attrs.getPermissions()) and 0x1FF,
         owner = attrs.getUID().toString(),
         group = attrs.getGID().toString()
     )

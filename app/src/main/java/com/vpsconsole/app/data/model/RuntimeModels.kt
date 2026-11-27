@@ -32,6 +32,7 @@ data class FileInfo(
     val size: Long,
     val modified: Long,
     val permissions: String,
+    val octalMode: Int = 0,
     val owner: String,
     val group: String
 ) {
