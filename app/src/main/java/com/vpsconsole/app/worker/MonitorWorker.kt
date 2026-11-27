@@ -59,7 +59,8 @@ class MonitorWorker(
                                 id = eventId,
                                 title = "${server.name}: ${rule.kind} alert",
                                 body = message,
-                                vibration = container.settings.settings.value.vibration
+                                vibration = container.settings.settings.value.vibration,
+                                sound = container.settings.settings.value.notificationSound
                             )
                         }
                     }
