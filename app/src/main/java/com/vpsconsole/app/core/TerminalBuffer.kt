@@ -17,6 +17,7 @@ package com.vpsconsole.app.core
 class TerminalBuffer(private val maxChars: Int = 40_000) {
     private val sb = StringBuilder()
     private var pendingCR = false
+    private var pendingEscInOsc = false
 
     private enum class Esc { NONE, ESC, CSI, OSC, CHARSET }
     private var esc = Esc.NONE
@@ -44,12 +45,28 @@ class TerminalBuffer(private val maxChars: Int = 40_000) {
                 }
 
                 Esc.OSC -> {
+                    if (pendingEscInOsc) {
+                        pendingEscInOsc = false
+                        if (chunk[i] == '\\') {
+                            i++
+                            esc = Esc.NONE
+                        }
+                        // Otherwise the ESC belonged to another sequence; keep
+                        // consuming OSC payload until BEL or ESC \ arrives.
+                        continue
+                    }
                     val c = chunk[i++]
                     if (c == BEL) {
                         esc = Esc.NONE
-                    } else if (c == ESC && i < chunk.length && chunk[i] == '\\') {
-                        i++
-                        esc = Esc.NONE
+                    } else if (c == ESC) {
+                        if (i < chunk.length && chunk[i] == '\\') {
+                            i++
+                            esc = Esc.NONE
+                        } else {
+                            // ESC was the final byte of this chunk — remember it
+                            // so an ESC \ split across reads is not lost.
+                            pendingEscInOsc = true
+                        }
                     }
                     continue
                 }
@@ -163,6 +180,9 @@ class TerminalBuffer(private val maxChars: Int = 40_000) {
     fun clear() {
         sb.setLength(0)
         pendingCR = false
+        pendingEscInOsc = false
+        esc = Esc.NONE
+        params.setLength(0)
         version++
     }
 

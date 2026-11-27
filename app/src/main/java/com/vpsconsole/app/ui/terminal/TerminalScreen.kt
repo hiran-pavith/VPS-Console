@@ -106,6 +106,8 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
                     if (settings.autoReconnect && reconnectAttempts < 5) {
                         reconnectAttempts++
                         kotlinx.coroutines.delay(2_000)
+                        // Re-check: the user may have tapped Disconnect during the delay.
+                        if (suppressReconnect) return@collect
                         reconnectKey++
                     }
                 }

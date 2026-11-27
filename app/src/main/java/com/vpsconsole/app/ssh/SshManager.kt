@@ -227,15 +227,24 @@ class SshManager(
         withContext(Dispatchers.IO) {
             runCatching {
                 val client = ensureConnected(serverId)
-                val session = client.startSession()
+                markBusy(serverId)
                 try {
-                    val fullCommand = if (command.contains("2>&1")) command else "$command 2>&1"
-                    val cmd = session.exec(fullCommand)
-                    val output = cmd.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-                    runCatching { cmd.join(3, TimeUnit.SECONDS) }
-                    output.trimEnd()
+                    val session = client.startSession()
+                    try {
+                        val fullCommand = if (command.contains("2>&1")) command else "$command 2>&1"
+                        val cmd = session.exec(fullCommand)
+                        // Bound the read itself — cmd.join() after readText() cannot
+                        // interrupt a command that never closes its stdout.
+                        val output = withTimeout(timeoutSeconds * 1000L) {
+                            cmd.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                        }
+                        runCatching { cmd.join(3, TimeUnit.SECONDS) }
+                        output.trimEnd()
+                    } finally {
+                        runCatching { session.close() }
+                    }
                 } finally {
-                    runCatching { session.close() }
+                    markIdle(serverId)
                 }
             }
         }
@@ -244,11 +253,16 @@ class SshManager(
         withContext(Dispatchers.IO) {
             runCatching {
                 val client = ensureConnected(serverId)
-                val sftp = client.newSFTPClient()
+                markBusy(serverId)
                 try {
-                    block(sftp)
+                    val sftp = client.newSFTPClient()
+                    try {
+                        block(sftp)
+                    } finally {
+                        runCatching { sftp.close() }
+                    }
                 } finally {
-                    runCatching { sftp.close() }
+                    markIdle(serverId)
                 }
             }
         }
@@ -281,12 +295,19 @@ class SshManager(
         // worker/UI refreshes cannot compute deltas against the same counters.
         val rawResult = runCatching {
             ensureConnected(serverId).let { client ->
-                val session = client.startSession()
+                markBusy(serverId)
                 try {
-                    val cmd = session.exec(MetricsCollector.PROBE_COMMAND)
-                    cmd.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                    val session = client.startSession()
+                    try {
+                        val cmd = session.exec(MetricsCollector.PROBE_COMMAND)
+                        withTimeout(30_000L) {
+                            cmd.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                        }
+                    } finally {
+                        runCatching { session.close() }
+                    }
                 } finally {
-                    runCatching { session.close() }
+                    markIdle(serverId)
                 }
             }
         }
