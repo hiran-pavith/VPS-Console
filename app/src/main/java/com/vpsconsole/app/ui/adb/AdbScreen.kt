@@ -1,5 +1,6 @@
 package com.vpsconsole.app.ui.adb
 
+import android.annotation.SuppressLint
 import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -53,6 +54,7 @@ import java.io.IOException
 
 private val adbTabs = listOf("Ports", "Shell", "Apps", "Logs", "Input", "Files", "Info", "Host")
 
+@SuppressLint("SdCardPath")
 @Composable
 fun AdbScreen(serverId: Long) {
     val container = LocalAppContainer.current
