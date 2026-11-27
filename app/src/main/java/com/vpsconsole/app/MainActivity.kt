@@ -28,6 +28,10 @@ import com.vpsconsole.app.ui.navigation.AppRoot
 import com.vpsconsole.app.ui.theme.VpsConsoleTheme
 
 class MainActivity : FragmentActivity() {
+    companion object {
+        private const val KEY_LOCKED = "locked"
+    }
+
     private val requestNotificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { /* granted or denied; notifications simply remain off if denied */ }
@@ -39,7 +43,8 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         val container = (application as VpsConsoleApp).container
         val settingsAtStart = container.settings.settings.value
-        lockedState.value = settingsAtStart.lockEnabled && container.secrets.isPinConfigured()
+        lockedState.value = savedInstanceState?.getBoolean(KEY_LOCKED)
+            ?: (settingsAtStart.lockEnabled && container.secrets.isPinConfigured())
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
@@ -84,6 +89,11 @@ class MainActivity : FragmentActivity() {
                 else -> Unit
             }
         })
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean(KEY_LOCKED, lockedState.value)
+        super.onSaveInstanceState(outState)
     }
 
     private fun unlockBiometric(onSuccess: () -> Unit) {
