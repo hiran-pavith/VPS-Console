@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import com.vpsconsole.app.core.formatBytes
 import com.vpsconsole.app.core.formatTimestamp
 import com.vpsconsole.app.data.model.FileInfo
+import com.vpsconsole.app.ssh.SftpStreams
 import com.vpsconsole.app.ui.LocalAppContainer
 import com.vpsconsole.app.ui.components.SectionCard
 import kotlinx.coroutines.Dispatchers
@@ -55,6 +56,7 @@ import kotlinx.coroutines.withContext
 import net.schmizz.sshj.sftp.FileMode
 import net.schmizz.sshj.sftp.SFTPClient
 import java.io.File
+import java.io.IOException
 
 @Composable
 fun FilesScreen(serverId: Long) {
@@ -78,23 +80,32 @@ fun FilesScreen(serverId: Long) {
 
     suspend fun load() {
         busy = true
-        val result = container.ssh.withSftp(serverId) { sftp ->
-            val target = if (path.isEmpty()) {
-                when (settings.sftpDefaultPath) {
-                    "root" -> "/".also { path = it }
-                    "custom" -> settings.sftpCustomPath.ifBlank { "/" }.also { path = it }
-                    else -> sftp.canonicalize(".").also { path = it }
-                }
-            } else path
-            listRemote(sftp, target, settings.showHiddenFiles)
+        try {
+            val result = container.ssh.withSftp(serverId) { sftp ->
+                val target = if (path.isBlank()) {
+                    when (settings.sftpDefaultPath) {
+                        "root" -> "/"
+                        "custom" -> settings.sftpCustomPath.ifBlank { "/" }
+                        else -> sftp.canonicalize(".")
+                    }
+                } else path
+                listRemote(sftp, target, settings.showHiddenFiles) to target
+            }
+            result.onSuccess { (listed, target) ->
+                entries = listed
+                path = target
+            }.onFailure { message = it.message ?: "Unable to list directory" }
+        } finally {
+            busy = false
         }
-        result.onSuccess { entries = it }.onFailure { message = it.message ?: "Unable to list directory" }
-        busy = false
     }
 
-    LaunchedEffect(serverId) { path = "" }
-
-    LaunchedEffect(serverId, path, settings.showHiddenFiles) { load() }
+    // Path changes are driven explicitly by Go/Open/Up and file operations;
+    // keying this effect on `path` previously cancelled its own in-flight load.
+    LaunchedEffect(serverId, settings.showHiddenFiles) {
+        path = ""
+        load()
+    }
 
     val pickUpload = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
@@ -131,7 +142,10 @@ fun FilesScreen(serverId: Long) {
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedButton(onClick = { path = if (path == "/") "/" else path.substringBeforeLast('/').ifEmpty { "/" } }) {
+                OutlinedButton(onClick = {
+                    path = if (path == "/") "/" else path.substringBeforeLast('/').ifEmpty { "/" }
+                    scope.launch { load() }
+                }) {
                     Text("Up")
                 }
                 OutlinedButton(onClick = { pickUpload.launch(arrayOf("*/*")) }) {
@@ -166,7 +180,10 @@ fun FilesScreen(serverId: Long) {
                             )
                         }
                         if (item.isDir) {
-                            TextButton(onClick = { path = item.path }) { Text("Open") }
+                            TextButton(onClick = {
+                                path = item.path
+                                scope.launch { load() }
+                            }) { Text("Open") }
                         } else {
                             IconButton(onClick = {
                                 scope.launch {
@@ -335,11 +352,13 @@ private suspend fun upload(
     uri: Uri,
     remotePath: String
 ) {
-    val cache = File(context.cacheDir, "upload-${System.currentTimeMillis()}")
     withContext(Dispatchers.IO) {
-        context.contentResolver.openInputStream(uri)?.use { input -> cache.outputStream().use { it.write(input.readBytes()) } }
-    }
-    manager.withSftp(serverId) { sftp -> sftp.put(cache.absolutePath, remotePath) }.getOrThrow()
+        val stream = context.contentResolver.openInputStream(uri)
+            ?: throw IOException("Cannot open the selected file")
+        stream.use { input ->
+            manager.withSftp(serverId) { sftp -> SftpStreams.upload(input, sftp, remotePath) }
+        }
+    }.getOrThrow()
 }
 
 private suspend fun download(
@@ -349,11 +368,13 @@ private suspend fun download(
     remotePath: String,
     uri: Uri
 ) {
-    val cache = File(context.cacheDir, "download-${System.currentTimeMillis()}")
-    manager.withSftp(serverId) { sftp -> sftp.get(remotePath, cache.absolutePath) }.getOrThrow()
-    withContext(Dispatchers.IO) {
-        context.contentResolver.openOutputStream(uri)?.use { it.write(cache.readBytes()) }
-    }
+    manager.withSftp(serverId) { sftp ->
+        withContext(Dispatchers.IO) {
+            val stream = context.contentResolver.openOutputStream(uri)
+                ?: throw IOException("Cannot open the destination file")
+            stream.use { output -> SftpStreams.download(sftp, remotePath, output) }
+        }
+    }.getOrThrow()
 }
 
 private fun listRemote(sftp: SFTPClient, path: String, showHidden: Boolean): List<FileInfo> = sftp.ls(path)
@@ -392,10 +413,9 @@ private fun parentOf(path: String): String {
     return if (index <= 0) "/" else trimmed.substring(0, index)
 }
 
-private fun uriFileName(context: Context, uri: Uri): String? {
-    val cursor = context.contentResolver.query(uri, null, null, null, null)
-    return cursor?.use {
-        val index = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-        if (index >= 0 && it.moveToFirst()) it.getString(index) else null
+private fun uriFileName(context: Context, uri: Uri): String? = runCatching {
+    context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+        val index = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+        if (index >= 0 && cursor.moveToFirst()) cursor.getString(index) else null
     }
-}
+}.getOrNull()
