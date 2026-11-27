@@ -255,7 +255,7 @@ private fun AppNavGraph(nav: NavHostController, modifier: Modifier) {
         composable(Routes.TERMINAL, arguments = longArg) { entry ->
             TerminalScreen(
                 serverId = entry.arguments?.getLong("serverId") ?: 0L,
-                onExit = { nav.navigate(Routes.SERVERS) }
+                onExit = { nav.navigateUp() }
             )
         }
         composable(Routes.MONITOR, arguments = longArg) { entry ->

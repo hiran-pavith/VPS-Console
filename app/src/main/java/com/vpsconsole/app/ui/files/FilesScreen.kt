@@ -86,7 +86,7 @@ fun FilesScreen(serverId: Long) {
                     else -> sftp.canonicalize(".").also { path = it }
                 }
             } else path
-            listRemote(sftp, target)
+            listRemote(sftp, target, settings.showHiddenFiles)
         }
         result.onSuccess { entries = it }.onFailure { message = it.message ?: "Unable to list directory" }
         busy = false
@@ -94,7 +94,7 @@ fun FilesScreen(serverId: Long) {
 
     LaunchedEffect(serverId) { path = "" }
 
-    LaunchedEffect(serverId, path) { load() }
+    LaunchedEffect(serverId, path, settings.showHiddenFiles) { load() }
 
     val pickUpload = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
@@ -353,7 +353,12 @@ private suspend fun download(
     }
 }
 
-private fun listRemote(sftp: SFTPClient, path: String): List<FileInfo> = sftp.ls(path).map { item ->
+private fun listRemote(sftp: SFTPClient, path: String, showHidden: Boolean): List<FileInfo> = sftp.ls(path)
+    .filter { item ->
+        val name = item.name
+        name != "." && name != ".." && (showHidden || !name.startsWith("."))
+    }
+    .map { item ->
     val attrs = item.attributes
     FileInfo(
         name = item.name,
