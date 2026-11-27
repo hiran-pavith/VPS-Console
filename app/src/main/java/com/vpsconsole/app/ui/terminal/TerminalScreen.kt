@@ -148,6 +148,7 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
                 else MaterialTheme.colorScheme.onSurfaceVariant
             )
             OutlinedButton(onClick = {
+                suppressReconnect = true
                 container.ssh.shellFor(serverId)?.close()
                 container.ssh.close(serverId)
                 status = "Disconnected"
