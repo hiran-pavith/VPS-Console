@@ -35,7 +35,9 @@ data class AppSettings(
     val showRamGauge: Boolean = true,
     val showDiskGauge: Boolean = true,
     val showNetworkGauge: Boolean = true,
-    val notificationSound: Boolean = true
+    val notificationSound: Boolean = true,
+    val servicesDefaultTab: String = "SERVICES",
+    val processesLimit: Int = 60
 )
 
 class SettingsStore(context: Context) {
@@ -74,7 +76,9 @@ class SettingsStore(context: Context) {
         showRamGauge = prefs.getBoolean(SHOW_RAM_GAUGE, true),
         showDiskGauge = prefs.getBoolean(SHOW_DISK_GAUGE, true),
         showNetworkGauge = prefs.getBoolean(SHOW_NETWORK_GAUGE, true),
-        notificationSound = prefs.getBoolean(NOTIFICATION_SOUND, true)
+        notificationSound = prefs.getBoolean(NOTIFICATION_SOUND, true),
+        servicesDefaultTab = prefs.getString(SERVICES_DEFAULT_TAB, "SERVICES") ?: "SERVICES",
+        processesLimit = prefs.getInt(PROCESSES_LIMIT, 60).coerceIn(10, 200)
     )
 
     fun update(transform: (AppSettings) -> AppSettings) {
@@ -107,6 +111,8 @@ class SettingsStore(context: Context) {
             putBoolean(SHOW_DISK_GAUGE, next.showDiskGauge)
             putBoolean(SHOW_NETWORK_GAUGE, next.showNetworkGauge)
             putBoolean(NOTIFICATION_SOUND, next.notificationSound)
+            putString(SERVICES_DEFAULT_TAB, next.servicesDefaultTab)
+            putInt(PROCESSES_LIMIT, next.processesLimit)
         }.apply()
         _settings.value = next
     }
@@ -143,5 +149,7 @@ class SettingsStore(context: Context) {
         const val SHOW_DISK_GAUGE = "show_disk_gauge"
         const val SHOW_NETWORK_GAUGE = "show_network_gauge"
         const val NOTIFICATION_SOUND = "notification_sound"
+        const val SERVICES_DEFAULT_TAB = "services_default_tab"
+        const val PROCESSES_LIMIT = "processes_limit"
     }
 }

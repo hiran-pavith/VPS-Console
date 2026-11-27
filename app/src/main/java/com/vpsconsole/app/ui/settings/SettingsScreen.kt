@@ -210,6 +210,29 @@ fun SettingsScreen() {
             }
         }
 
+        SectionCard(title = "Services tab") {
+            Text("Default tab", style = MaterialTheme.typography.bodyMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf("SERVICES", "PROCESSES", "DOCKER").forEach { value ->
+                    FilterChip(
+                        selected = settings.servicesDefaultTab == value,
+                        onClick = { container.settings.update { it.copy(servicesDefaultTab = value) } },
+                        label = { Text(value.lowercase().replaceFirstChar { it.uppercase() }) }
+                    )
+                }
+            }
+            Text("Processes to show: ${settings.processesLimit}")
+            Slider(
+                value = settings.processesLimit.toFloat(),
+                onValueChange = { container.settings.update { s -> s.copy(processesLimit = it.toInt()) } },
+                valueRange = 10f..200f,
+                steps = 18
+            )
+        }
+
         SectionCard(title = "File manager") {
             SwitchRow("Show hidden files", settings.showHiddenFiles) {
                 container.settings.update { s -> s.copy(showHiddenFiles = it) }

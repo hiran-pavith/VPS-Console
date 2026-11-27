@@ -22,6 +22,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,7 +50,10 @@ private enum class Tab { SERVICES, PROCESSES, DOCKER }
 fun ServicesScreen(serverId: Long) {
     val container = LocalAppContainer.current
     val scope = rememberCoroutineScope()
-    var tab by remember { mutableStateOf(Tab.SERVICES) }
+    val settings by container.settings.settings.collectAsState()
+    var tab by remember { mutableStateOf(
+        runCatching { Tab.valueOf(settings.servicesDefaultTab) }.getOrDefault(Tab.SERVICES)
+    ) }
     var raw by remember { mutableStateOf("") }
     var loadAvg by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
@@ -61,7 +65,7 @@ fun ServicesScreen(serverId: Long) {
         busy = true
         val command = when (tab) {
             Tab.SERVICES -> "systemctl list-units --type=service --all --no-pager --plain --no-legend"
-            Tab.PROCESSES -> "ps -eo pid,user,%cpu,%mem,stat,args --sort=-%cpu | head -n 60"
+            Tab.PROCESSES -> "ps -eo pid,user,%cpu,%mem,stat,args --sort=-%cpu | head -n ${settings.processesLimit}"
             Tab.DOCKER -> "docker ps -a --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.Status}}|{{.Ports}}'"
         }
         raw = container.ssh.exec(serverId, command, timeoutSeconds = 60)
