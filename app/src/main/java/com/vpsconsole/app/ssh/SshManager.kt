@@ -106,7 +106,23 @@ class SshManager(
     }
 
     suspend fun connect(serverId: Long): Result<Unit> = withContext(Dispatchers.IO) {
-        synchronized(lockFor(serverId)) {
+        // All suspendable DB reads happen before the lock. Only blocking SSHJ
+        // work and the atomic handle swap run inside the critical section.
+        val server = serverRepo.get(serverId)
+            ?: return@withContext Result.failure(IllegalArgumentException("Server not found"))
+        val secret = serverRepo.secretFor(server)
+            ?: return@withContext Result.failure(IllegalStateException("No credential stored for this server"))
+        if (secret.isEmpty()) {
+            return@withContext Result.failure(IllegalStateException("No credential stored for this server"))
+        }
+        val passphrase = if (server.authType == com.vpsconsole.app.data.model.AuthType.KEY) {
+            serverRepo.passphraseFor(server)
+        } else null
+        val policy = settings.settings.value.hostKeyPolicy
+        val keepAliveSeconds = settings.settings.value.keepAliveSeconds
+        val known = knownHostRepo.forHost(server.host, server.port)
+
+        val result = synchronized(lockFor(serverId)) {
             val current = handles[serverId]
             if (current != null && current.client.isConnected && current.client.isAuthenticated) {
                 return@synchronized Result.success(Unit)
@@ -119,62 +135,52 @@ class SshManager(
                 handles.remove(serverId, current)
             }
 
-            val server = serverRepo.get(serverId)
-                ?: return@synchronized Result.failure(IllegalArgumentException("Server not found"))
-            val secret = serverRepo.secretFor(server)
-                ?: return@synchronized Result.failure(IllegalStateException("No credential stored for this server"))
-            if (secret.isEmpty()) {
-                return@synchronized Result.failure(IllegalStateException("No credential stored for this server"))
-            }
-
             setState(serverId, ConnectionState.CONNECTING)
             val client = SSHClient(AndroidSshConfig())
             runCatching {
-            val policy = settings.settings.value.hostKeyPolicy
-            val known = knownHostRepo.forHost(server.host, server.port)
-            client.transport.timeoutMs = 30_000
-            client.addHostKeyVerifier(object : HostKeyVerifier {
-                override fun verify(hostname: String?, port: Int, key: PublicKey?): Boolean {
-                    if (key == null) return false
-                    val fingerprint = SecurityUtils.getFingerprint(key)
-                    val algorithm = key.algorithm ?: "UNKNOWN"
-                    val trusted = known.firstOrNull { it.algorithm == algorithm }
-                    if (trusted != null) return trusted.fingerprint == fingerprint
-                    if (policy == com.vpsconsole.app.data.model.HostKeyPolicy.STRICT) return false
-                    return runCatching {
-                        runBlocking(Dispatchers.IO) {
-                            knownHostRepo.trust(server.host, server.port, algorithm, fingerprint)
-                        }
-                        true
-                    }.getOrDefault(false)
+                client.transport.timeoutMs = 30_000
+                client.addHostKeyVerifier(object : HostKeyVerifier {
+                    override fun verify(hostname: String?, port: Int, key: PublicKey?): Boolean {
+                        if (key == null) return false
+                        val fingerprint = SecurityUtils.getFingerprint(key)
+                        val algorithm = key.algorithm ?: "UNKNOWN"
+                        val trusted = known.firstOrNull { it.algorithm == algorithm }
+                        if (trusted != null) return trusted.fingerprint == fingerprint
+                        if (policy == com.vpsconsole.app.data.model.HostKeyPolicy.STRICT) return false
+                        return runCatching {
+                            runBlocking(Dispatchers.IO) {
+                                knownHostRepo.trust(server.host, server.port, algorithm, fingerprint)
+                            }
+                            true
+                        }.getOrDefault(false)
+                    }
+
+                    override fun findExistingAlgorithms(hostname: String?, port: Int): List<String> =
+                        known.map { it.algorithm }.distinct()
+                })
+
+                client.connect(server.host, server.port)
+                client.connection.keepAlive.keepAliveInterval = keepAliveSeconds
+
+                if (server.authType == com.vpsconsole.app.data.model.AuthType.KEY) {
+                    val passwordFinder = passphrase?.takeIf { it.isNotEmpty() }
+                        ?.let { PasswordUtils.createOneOff(it.toCharArray()) }
+                    val keyProvider = client.loadKeys(secret.trim(), null, passwordFinder)
+                    client.authPublickey(server.username, keyProvider)
+                } else {
+                    client.authPassword(server.username, secret)
                 }
+                if (!client.isAuthenticated) throw IllegalStateException("Authentication failed")
 
-                override fun findExistingAlgorithms(hostname: String?, port: Int): List<String> =
-                    known.map { it.algorithm }.distinct()
-            })
-
-            client.connect(server.host, server.port)
-            client.connection.keepAlive.keepAliveInterval = settings.settings.value.keepAliveSeconds
-
-            if (server.authType == com.vpsconsole.app.data.model.AuthType.KEY) {
-                val passphrase = serverRepo.passphraseFor(server)
-                val passwordFinder = passphrase?.takeIf { it.isNotEmpty() }
-                    ?.let { PasswordUtils.createOneOff(it.toCharArray()) }
-                val keyProvider = client.loadKeys(secret.trim(), null, passwordFinder)
-                client.authPublickey(server.username, keyProvider)
-            } else {
-                client.authPassword(server.username, secret)
-            }
-            if (!client.isAuthenticated) throw IllegalStateException("Authentication failed")
-
-            handles[serverId] = Handle(server, client)
-            setState(serverId, ConnectionState.CONNECTED)
-            serverRepo.touch(serverId, System.currentTimeMillis())
+                handles[serverId] = Handle(server, client)
+                setState(serverId, ConnectionState.CONNECTED)
             }.onFailure { error ->
                 runCatching { client.disconnect() }
                 setState(serverId, ConnectionState.FAILED, error.message ?: "Connection failed")
             }
         }
+        if (result.isSuccess) runCatching { serverRepo.touch(serverId, System.currentTimeMillis()) }
+        result
     }
 
     fun close(serverId: Long) {
@@ -274,12 +280,13 @@ class SshManager(
             }
         }
         rawResult.mapCatching { raw ->
-            synchronized(lockFor(serverId)) {
-                val metric = collector.parse(raw, serverId, lastMetrics[serverId], System.currentTimeMillis())
-                lastMetrics[serverId] = metric
-                metricRepo.add(metric)
-                metric
+            val metric = synchronized(lockFor(serverId)) {
+                val parsed = collector.parse(raw, serverId, lastMetrics[serverId], System.currentTimeMillis())
+                lastMetrics[serverId] = parsed
+                parsed
             }
+            metricRepo.add(metric)
+            metric
         }
     }
 
