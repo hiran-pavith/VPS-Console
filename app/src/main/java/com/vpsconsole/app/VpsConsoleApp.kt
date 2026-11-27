@@ -2,6 +2,7 @@ package com.vpsconsole.app
 
 import android.app.Application
 import android.util.Log
+import com.vpsconsole.app.core.CrashReport
 import com.vpsconsole.app.worker.MonitorWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -17,6 +18,7 @@ class VpsConsoleApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        CrashReport.install(this)
         // Use SpongyCastle instead of the broken Android BC JCE provider.
         // It exposes the JCA algorithms SSHJ asks for by name (SHA-256, ECDSA KeyFactory, ...).
         // curve25519/Ed25519 are still filtered out in SshManager because SC 1.58 does not
