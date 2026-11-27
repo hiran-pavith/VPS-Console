@@ -198,11 +198,16 @@ class TunnelService : Service() {
     }
 
     private fun startForeground() {
+        // FOREGROUND_SERVICE_TYPE_DATA_SYNC was added in API 29; referencing it on
+        // API 26-28 would throw NoSuchFieldError at runtime.
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+        } else 0
         ServiceCompat.startForeground(
             this,
             NOTIFICATION_ID,
             buildNotification(TunnelState.status.value),
-            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            type
         )
     }
 
@@ -225,7 +230,7 @@ class TunnelService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         return NotificationCompat.Builder(this, CHANNEL)
-            .setSmallIcon(R.drawable.ic_launcher)
+            .setSmallIcon(R.drawable.ic_stat)
             .setContentTitle("Reverse SSH Tunnel")
             .setContentText(text)
             .setContentIntent(open)
