@@ -164,17 +164,17 @@ class TunnelService : Service() {
 
                 val bindHost = config.remoteBindHost.trim()
                 val fwd = if (bindHost.isEmpty()) {
-                    RemotePortForwarder.Forward(remotePort)
+                    RemotePortForwarder.Forward(rPort)
                 } else {
-                    RemotePortForwarder.Forward(bindHost, remotePort)
+                    RemotePortForwarder.Forward(bindHost, rPort)
                 }
                 ssh.remotePortForwarder.bind(
                     fwd,
-                    SocketForwardingConnectListener(InetSocketAddress(config.targetHost.trim(), targetPort))
+                    SocketForwardingConnectListener(InetSocketAddress(config.targetHost.trim(), tPort))
                 )
                 forward = fwd
                 connected = true
-                TunnelState.log("Remote port $remotePort bound")
+                TunnelState.log("Remote port $rPort bound")
 
                 val displayBind = if (bindHost.isEmpty()) "localhost" else bindHost
                 TunnelState.status.value =
