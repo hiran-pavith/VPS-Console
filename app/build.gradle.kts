@@ -52,6 +52,27 @@ android {
         buildConfig = true
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("vps-console-release.jks")
+            storePassword = "vpsconsole2026"
+            keyAlias = "vpsconsole"
+            keyPassword = "vpsconsole2026"
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+
     packaging {
         resources {
             excludes += setOf(
