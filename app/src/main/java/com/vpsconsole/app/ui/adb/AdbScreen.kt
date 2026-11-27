@@ -1,5 +1,7 @@
 package com.vpsconsole.app.ui.adb
 
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 import android.annotation.SuppressLint
 import android.graphics.BitmapFactory
 import android.util.Base64
@@ -388,7 +390,7 @@ private fun AdbScreenBody(serverId: Long) {
                     value = apkPath, onValueChange = { apkPath = it },
                     label = { Text("APK path on VPS host") }, modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                AdaptiveActionRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     OutlinedButton(onClick = {
                         runAdb({ adb.packages(config) }) { packageOutput = it }
                     }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("List") }
@@ -399,7 +401,7 @@ private fun AdbScreenBody(serverId: Long) {
                         if (packageName.isNotBlank()) runAdb({ adb.stopPackage(config, packageName.trim()) }) { packageOutput = it }
                     }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Stop") }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                AdaptiveActionRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     OutlinedButton(onClick = {
                         if (apkPath.isNotBlank()) runAdb({ adb.install(config, apkPath.trim()) }) { packageOutput = it }
                     }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Install") }

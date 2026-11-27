@@ -15,6 +15,8 @@
 -keep class com.hierynomus.sshj.** { *; }
 -keep class com.vpsconsole.app.data.model.** { *; }
 -keep class com.vpsconsole.app.data.db.** { *; }
+-keep class com.vpsconsole.app.adb.** { *; }
+-keep class com.vpsconsole.app.ui.adb.** { *; }
 -keep class org.bouncycastle.jce.provider.BouncyCastleProvider { *; }
 -keep class org.bouncycastle.** { *; }
 -keep class org.spongycastle.jce.provider.BouncyCastleProvider { *; }
