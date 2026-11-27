@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.Usb
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -45,6 +46,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.vpsconsole.app.data.model.ServerProfile
 import com.vpsconsole.app.ui.LocalAppContainer
+import com.vpsconsole.app.ui.adb.AdbScreen
 import com.vpsconsole.app.ui.alerts.AlertsScreen
 import com.vpsconsole.app.ui.dashboard.DashboardScreen
 import com.vpsconsole.app.ui.extras.BackupsScreen
@@ -70,6 +72,7 @@ private val navItems = listOf(
     NavItem("servers", "Servers", Icons.Filled.Computer) { Routes.SERVERS },
     NavItem("terminal", "Terminal", Icons.Filled.Terminal) { Routes.terminal(it) },
     NavItem("tools", "Tools", Icons.Filled.Build) { Routes.tools(it) },
+    NavItem("adb", "ADB", Icons.Filled.Usb) { Routes.adb(it) },
     NavItem("settings", "Settings", Icons.Filled.Settings) { Routes.SETTINGS }
 )
 
@@ -162,6 +165,7 @@ private fun AppScaffold(
                                         route.startsWith("monitor") -> Routes.monitor(server.id)
                                         route.startsWith("services") -> Routes.services(server.id)
                                         route.startsWith("files") -> Routes.files(server.id)
+                                        route.startsWith("adb") -> Routes.adb(server.id)
                                         else -> null
                                     }
                                     if (target != null) nav.navigate(target) {
@@ -226,6 +230,7 @@ private fun titleFor(route: String): String = when {
     route.startsWith("backups") -> "Backups"
     route.startsWith("tunnels") -> "SSH Tunnels"
     route.startsWith("scripts") -> "Command Library"
+    route.startsWith("adb") -> "ADB Console"
     else -> "VPS Console"
 }
 
@@ -299,6 +304,9 @@ private fun AppNavGraph(nav: NavHostController, modifier: Modifier) {
         }
         composable(Routes.SCRIPTS, arguments = longArg) { entry ->
             ScriptsScreen(entry.arguments?.getLong("serverId") ?: 0L)
+        }
+        composable(Routes.ADB, arguments = longArg) { entry ->
+            AdbScreen(entry.arguments?.getLong("serverId") ?: 0L)
         }
     }
 }
