@@ -45,7 +45,6 @@ import com.vpsconsole.app.core.percent
 import com.vpsconsole.app.data.model.AlertRuleEntity
 import com.vpsconsole.app.data.model.MetricKind
 import com.vpsconsole.app.ui.LocalAppContainer
-import com.vpsconsole.app.ui.components.MetricTile
 import com.vpsconsole.app.ui.components.SectionCard
 import com.vpsconsole.app.ui.components.StatusBadge
 import com.vpsconsole.app.ssh.ConnectionState
@@ -97,46 +96,62 @@ fun MonitorScreen(serverId: Long) {
             }
         }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                MetricTile(
-                    "CPU", percent(latest?.cpu ?: 0f),
-                    latest?.let { formatTimestamp(it.timestamp) }.orEmpty(),
-                    color = Color(0xFF58A6FF), progress = (latest?.cpu ?: 0f) / 100f,
-                    modifier = Modifier.weight(1f)
-                )
-                MetricTile(
-                    "RAM", percent(latest?.ram ?: 0f),
-                    color = Color(0xFF3FB950), progress = (latest?.ram ?: 0f) / 100f,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                MetricTile(
-                    "Disk", percent(latest?.disk ?: 0f),
-                    color = Color(0xFFD29922), progress = (latest?.disk ?: 0f) / 100f,
-                    modifier = Modifier.weight(1f)
-                )
-                MetricTile(
-                    "Load", String.format(Locale.US, "%.2f", latest?.load ?: 0f),
-                    "uptime ${formatUptime(latest?.uptimeSec ?: 0)}",
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-        item {
-            SectionCard(title = "Network · ↓ ${formatRate(latest?.rxMbps ?: 0f)}  ↑ ${formatRate(latest?.txMbps ?: 0f)}") {
-                LineChart(metrics.map { it.rxMbps }, Color(0xFF58A6FF), Modifier.fillMaxWidth().height(110.dp))
-                LineChart(metrics.map { it.txMbps }, Color(0xFF3FB950), Modifier.fillMaxWidth().height(110.dp))
-            }
-        }
-        item {
-            SectionCard(title = "CPU history") {
-                LineChart(metrics.map { it.cpu }, Color(0xFF58A6FF), Modifier.fillMaxWidth().height(140.dp))
-            }
-        }
-        item {
-            SectionCard(title = "Memory history") {
-                LineChart(metrics.map { it.ram }, Color(0xFF3FB950), Modifier.fillMaxWidth().height(140.dp))
+            SectionCard(title = "Live metrics") {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    CircleGauge(
+                        label = "CPU", valueText = percent(latest?.cpu ?: 0f),
+                        fraction = (latest?.cpu ?: 0f) / 100f,
+                        color = Color(0xFF58A6FF),
+                        modifier = Modifier.weight(1f)
+                    )
+                    CircleGauge(
+                        label = "RAM", valueText = percent(latest?.ram ?: 0f),
+                        fraction = (latest?.ram ?: 0f) / 100f,
+                        color = Color(0xFF3FB950),
+                        modifier = Modifier.weight(1f)
+                    )
+                    CircleGauge(
+                        label = "Disk", valueText = percent(latest?.disk ?: 0f),
+                        fraction = (latest?.disk ?: 0f) / 100f,
+                        color = Color(0xFFD29922),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    CircleGauge(
+                        label = "Load", valueText = String.format(Locale.US, "%.2f", latest?.load ?: 0f),
+                        fraction = ((latest?.load ?: 0f) / 4f).coerceIn(0f, 1f),
+                        color = Color(0xFFA371F7),
+                        caption = "uptime ${formatUptime(latest?.uptimeSec ?: 0)}",
+                        modifier = Modifier.weight(1f)
+                    )
+                    CircleGauge(
+                        label = "↓ Rx", valueText = formatRate(latest?.rxMbps ?: 0f),
+                        fraction = networkFraction(latest?.rxMbps ?: 0f, latest?.txMbps ?: 0f),
+                        color = Color(0xFF58A6FF),
+                        modifier = Modifier.weight(1f)
+                    )
+                    CircleGauge(
+                        label = "↑ Tx", valueText = formatRate(latest?.txMbps ?: 0f),
+                        fraction = networkFraction(latest?.txMbps ?: 0f, latest?.rxMbps ?: 0f),
+                        color = Color(0xFF3FB950),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                if (latest != null) {
+                    Text(
+                        "Updated ${formatTimestamp(latest.timestamp)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
+                    )
+                }
             }
         }
         item {
@@ -205,24 +220,70 @@ fun MonitorScreen(serverId: Long) {
     }
 }
 
+/** Network gauge fraction: relative to the larger of rx/tx, with a 100 Mbps floor. */
+private fun networkFraction(value: Float, other: Float): Float {
+    val scale = maxOf(value, other, 100f)
+    return (value / scale).coerceIn(0f, 1f)
+}
+
 @Composable
-private fun LineChart(values: List<Float>, color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier) {
-        if (values.size < 2) return@Canvas
-        val max = values.maxOrNull()?.coerceAtLeast(1f) ?: 1f
-        val path = Path()
-        val stepX = size.width / (values.size - 1)
-        values.forEachIndexed { index, value ->
-            val x = index * stepX
-            val y = size.height - (value / max) * size.height * 0.9f
-            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+private fun CircleGauge(
+    label: String,
+    valueText: String,
+    fraction: Float,
+    color: Color,
+    modifier: Modifier = Modifier,
+    caption: String = ""
+) {
+    val progress = fraction.coerceIn(0f, 1f)
+    Column(
+        modifier = modifier.padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(108.dp)) {
+            Canvas(Modifier.fillMaxSize()) {
+                val strokeWidth = 12.dp.toPx()
+                val diameter = size.minDimension - strokeWidth
+                val topLeft = Offset((size.width - diameter) / 2f, (size.height - diameter) / 2f)
+                val arcSize = Size(diameter, diameter)
+                val style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                // Track
+                drawArc(
+                    color = color.copy(alpha = 0.15f),
+                    startAngle = -90f, sweepAngle = 360f, useCenter = false,
+                    topLeft = topLeft, size = arcSize, style = style
+                )
+                // Progress (full circle for 100%)
+                if (progress > 0f) {
+                    drawArc(
+                        color = color,
+                        startAngle = -90f, sweepAngle = 360f * progress, useCenter = false,
+                        topLeft = topLeft, size = arcSize, style = style
+                    )
+                }
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    valueText,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = color,
+                    maxLines = 1
+                )
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
-        drawPath(path, color, style = Stroke(width = 3f))
-        drawLine(
-            color = color.copy(alpha = 0.15f),
-            start = Offset(0f, size.height),
-            end = Offset(size.width, size.height),
-            strokeWidth = 2f
-        )
+        if (caption.isNotEmpty()) {
+            Text(
+                caption,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
