@@ -1,10 +1,12 @@
 package com.vpsconsole.app.ssh
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -35,37 +37,56 @@ class ShellSession(client: SSHClient) {
     )
     val closed = MutableStateFlow(false)
 
+    private val writeChannel = Channel<String>(Channel.UNLIMITED)
+
     init {
         scope.launch {
             val buffer = CharArray(2048)
             val reader = InputStreamReader(shell.inputStream, Charsets.UTF_8)
-            runCatching {
+            try {
                 while (!closed.value) {
                     val read = reader.read(buffer)
                     if (read < 0) break
                     if (read > 0) output.emit(String(buffer, 0, read))
                 }
-            }.onFailure { errors.emit(it.message ?: "Shell read failed") }
-            closed.value = true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                errors.emit(e.message ?: "Shell read failed")
+            } finally {
+                closed.value = true
+            }
         }
         scope.launch {
             val buffer = CharArray(1024)
             val reader = InputStreamReader(shell.errorStream, Charsets.UTF_8)
-            runCatching {
+            try {
                 while (!closed.value) {
                     val read = reader.read(buffer)
                     if (read < 0) break
                     if (read > 0) errors.emit(String(buffer, 0, read))
                 }
-            }.onFailure { errors.emit(it.message ?: "Shell error read failed") }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                errors.emit(e.message ?: "Shell error read failed")
+            }
+        }
+        // Writes are serialized on IO so a slow SSH window can never block the
+        // Main thread (and therefore freeze Compose collection/rendering).
+        scope.launch {
+            for (text in writeChannel) {
+                runCatching {
+                    shell.outputStream.write(text.toByteArray(Charsets.UTF_8))
+                    shell.outputStream.flush()
+                }.onFailure { errors.tryEmit(it.message ?: "Write failed") }
+            }
         }
     }
 
     fun write(text: String) {
-        runCatching {
-            shell.outputStream.write(text.toByteArray(Charsets.UTF_8))
-            shell.outputStream.flush()
-        }.onFailure { errors.tryEmit(it.message ?: "Write failed") }
+        if (closed.value) return
+        writeChannel.trySend(text)
     }
 
     fun resize(cols: Int, rows: Int) {
@@ -73,7 +94,9 @@ class ShellSession(client: SSHClient) {
     }
 
     fun close() {
+        if (closed.value) return
         closed.value = true
+        writeChannel.close()
         runCatching { shell.close() }
         runCatching { session.close() }
         scope.cancel()

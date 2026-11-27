@@ -57,10 +57,12 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
     var historyIndex by remember { mutableIntStateOf(0) } // history.size = no selection
     var reconnectKey by remember { mutableIntStateOf(0) }
     var reconnectAttempts by remember { mutableIntStateOf(0) }
+    var suppressReconnect by remember(serverId) { mutableStateOf(false) }
     val scroll = rememberScrollState()
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(serverId, reconnectKey) {
+        suppressReconnect = false
         status = "Connecting…"
         val connect = container.ssh.connect(serverId)
         if (connect.isFailure) {
@@ -98,6 +100,9 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
                 session.closed.collect { isClosed ->
                     if (!isClosed) return@collect
                     if (!status.startsWith("Error")) status = "Disconnected"
+                    // A deliberate Disconnect must not be immediately undone by
+                    // auto-reconnect.
+                    if (suppressReconnect) return@collect
                     if (settings.autoReconnect && reconnectAttempts < 5) {
                         reconnectAttempts++
                         kotlinx.coroutines.delay(2_000)
