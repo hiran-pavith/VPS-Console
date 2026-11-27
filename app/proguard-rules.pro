@@ -1,6 +1,12 @@
 -dontwarn net.schmizz.**
 -dontwarn com.hierynomus.**
 -dontwarn org.slf4j.impl.**
+# Android has no javax.naming (LDAP/JNDI) or sun.security internals; BC/EdDSA
+# reference them in optional code paths this app never uses.
+-dontwarn javax.naming.**
+-dontwarn sun.security.**
+-dontwarn org.bouncycastle.jce.provider.X509LDAPCertStoreSpi
+-dontwarn org.bouncycastle.cert.dane.**
 -keep class net.schmizz.sshj.** { *; }
 -keep class com.hierynomus.sshj.** { *; }
 -keep class com.vpsconsole.app.data.model.** { *; }
