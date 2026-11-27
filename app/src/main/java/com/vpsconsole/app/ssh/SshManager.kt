@@ -233,9 +233,9 @@ class SshManager(
     suspend fun exec(serverId: Long, command: String, timeoutSeconds: Long = 45): Result<String> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val client = ensureConnected(serverId)
                 markBusy(serverId)
                 try {
+                    val client = ensureConnected(serverId)
                     val session = client.startSession()
                     try {
                         val fullCommand = if (command.contains("2>&1")) command else "$command 2>&1"
@@ -259,9 +259,9 @@ class SshManager(
     suspend fun <T> withSftp(serverId: Long, block: suspend (SFTPClient) -> T): Result<T> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val client = ensureConnected(serverId)
                 markBusy(serverId)
                 try {
+                    val client = ensureConnected(serverId)
                     val sftp = client.newSFTPClient()
                     try {
                         block(sftp)
@@ -301,9 +301,9 @@ class SshManager(
         // Probe outside the lock, but make the baseline swap atomic so concurrent
         // worker/UI refreshes cannot compute deltas against the same counters.
         val rawResult = runCatching {
-            ensureConnected(serverId).let { client ->
-                markBusy(serverId)
-                try {
+            markBusy(serverId)
+            try {
+                ensureConnected(serverId).let { client ->
                     val session = client.startSession()
                     try {
                         val cmd = session.exec(MetricsCollector.PROBE_COMMAND)
