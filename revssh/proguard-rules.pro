@@ -6,7 +6,11 @@
 -dontwarn com.google.errorprone.annotations.**
 -dontwarn javax.annotation.**
 -dontwarn javax.annotation.concurrent.**
+-dontwarn org.bouncycastle.jce.provider.X509LDAPCertStoreSpi
+-dontwarn org.bouncycastle.cert.dane.**
 -keep class net.schmizz.sshj.** { *; }
 -keep class com.hierynomus.sshj.** { *; }
+-keep class org.bouncycastle.jce.provider.BouncyCastleProvider { *; }
+-keep class org.bouncycastle.** { *; }
 -keep class org.spongycastle.jce.provider.BouncyCastleProvider { *; }
 -keep class org.spongycastle.** { *; }
