@@ -200,7 +200,7 @@ fun MonitorScreen(serverId: Long) {
                     )
                     Button(
                         onClick = {
-                            val value = newThreshold.toFloatOrNull()?.coerceIn(1f, 100f) ?: return@Button
+                            val value = newThreshold.toFloatOrNull()?.takeIf { it.isFinite() }?.coerceIn(1f, 100f) ?: return@Button
                             scope.launch {
                                 container.alertRepo.saveRule(
                                     AlertRuleEntity(serverId = serverId, kind = newKind, threshold = value)

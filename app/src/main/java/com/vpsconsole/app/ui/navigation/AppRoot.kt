@@ -107,6 +107,7 @@ private fun AppNavRail(nav: NavHostController, route: String, selectedId: Long) 
                     nav.navigate(item.target(selectedId)) {
                         launchSingleTop = true
                         restoreState = true
+                        popUpTo(nav.graph.startDestinationId) { saveState = true }
                     }
                 },
                 icon = { Icon(item.icon, contentDescription = item.label) },
@@ -163,7 +164,10 @@ private fun AppScaffold(
                                         route.startsWith("files") -> Routes.files(server.id)
                                         else -> null
                                     }
-                                    if (target != null) nav.navigate(target) { launchSingleTop = true }
+                                    if (target != null) nav.navigate(target) {
+                                        launchSingleTop = true
+                                        popUpTo(target) { inclusive = true }
+                                    }
                                     serverMenu = false
                                 }
                             )
@@ -189,6 +193,7 @@ private fun AppScaffold(
                                 nav.navigate(item.target(selectedId)) {
                                     launchSingleTop = true
                                     restoreState = true
+                                    popUpTo(nav.graph.startDestinationId) { saveState = true }
                                 }
                             },
                             icon = { Icon(item.icon, contentDescription = item.label) },

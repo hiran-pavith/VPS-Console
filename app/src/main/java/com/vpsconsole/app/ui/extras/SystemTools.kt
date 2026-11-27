@@ -108,7 +108,7 @@ fun CronScreen(serverId: Long) {
     val entries = parseCron(raw)
 
     suspend fun reload() {
-        raw = runCommand(container, serverId, "crontab -l 2>&1 || true")
+        raw = runCommand(container, serverId, "crontab -l 2>/dev/null || true")
     }
 
     LaunchedEffect(serverId) { reload() }
@@ -127,7 +127,7 @@ fun CronScreen(serverId: Long) {
             OutlinedTextField(value = command, onValueChange = { command = it }, label = { Text("Command") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             Button(onClick = {
                 if (command.isNotBlank()) scope.launch {
-                    write(raw.lines().filter { it.isNotBlank() } + "$schedule $command")
+                    write(raw.lines().filter { it.isNotBlank() && !it.startsWith("no crontab for") } + "$schedule $command")
                     command = ""
                 }
             }) { Text("Add job") }

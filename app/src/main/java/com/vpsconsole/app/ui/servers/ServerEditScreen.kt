@@ -138,9 +138,9 @@ fun ServerEditScreen(serverId: Long, onSaved: () -> Unit, onCancel: () -> Unit) 
             group = group.trim(),
             note = note.trim(),
             monitoringEnabled = monitoring,
-            cpuThreshold = cpuThreshold.toFloatOrNull()?.coerceIn(1f, 100f) ?: 85f,
-            ramThreshold = ramThreshold.toFloatOrNull()?.coerceIn(1f, 100f) ?: 90f,
-            diskThreshold = diskThreshold.toFloatOrNull()?.coerceIn(1f, 100f) ?: 90f,
+            cpuThreshold = cpuThreshold.toFloatOrNull()?.takeIf { it.isFinite() }?.coerceIn(1f, 100f) ?: 85f,
+            ramThreshold = ramThreshold.toFloatOrNull()?.takeIf { it.isFinite() }?.coerceIn(1f, 100f) ?: 90f,
+            diskThreshold = diskThreshold.toFloatOrNull()?.takeIf { it.isFinite() }?.coerceIn(1f, 100f) ?: 90f,
             createdAt = existing?.createdAt ?: System.currentTimeMillis(),
             lastConnectedAt = existing?.lastConnectedAt,
             hostKeyFingerprint = existing?.hostKeyFingerprint
