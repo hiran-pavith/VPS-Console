@@ -18,13 +18,18 @@ class ShellSession(client: SSHClient) {
     private val shell: Session.Shell = session.startShell()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    // DROP_OLDEST keeps the freshest terminal text and never silently loses the
-    // newest chunk when the UI is briefly busy rendering.
+    // Replay is essential: the reader starts in init(), but the Compose
+    // collector only subscribes after startShell() returns. Without replay the
+    // login banner and first prompt are emitted before anyone is listening and
+    // are lost, which makes the terminal look dead until the first command.
+    // DROP_OLDEST keeps the freshest terminal text when the UI is briefly busy.
     val output = MutableSharedFlow<String>(
+        replay = 256,
         extraBufferCapacity = 1024,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
     val errors = MutableSharedFlow<String>(
+        replay = 32,
         extraBufferCapacity = 128,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )

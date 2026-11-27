@@ -89,9 +89,9 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
             }
             launch {
                 session.errors.collect { msg ->
-                    buffer.append("\r\n[error] $msg\r\n")
+                    // stderr is normal shell output, not a connection failure.
+                    buffer.append("\r\n[stderr] $msg\r\n")
                     rendered = buffer.text
-                    status = "Error: $msg"
                 }
             }
             launch {
@@ -113,7 +113,10 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
     }
 
     LaunchedEffect(rendered) {
-        if (scroll.maxValue > 0) scroll.scrollTo(scroll.maxValue)
+        // Int.MAX_VALUE is clamped by ScrollState to the current max, ensuring
+        // newly streamed lines are immediately visible instead of sitting just
+        // below the viewport after a stale maxValue read.
+        scroll.scrollTo(Int.MAX_VALUE)
     }
 
     fun send(text: String, appendHistory: Boolean = true) {

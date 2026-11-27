@@ -1,12 +1,16 @@
 package com.vpsconsole.app.core
 
 /**
- * Small terminal text buffer: strips ANSI escape sequences, handles carriage
- * returns and backspaces so interactive shell output stays readable.
+ * Terminal text buffer: strips ANSI color sequences, handles carriage returns
+ * and backspaces so interactive shell output stays readable.
  *
  * PTYs translate '\n' into "\r\n". A bare '\r' means "return cursor to column
  * zero" (overwrite the current line), but "\r\n" is just a newline and must
  * NOT erase the line. A pending flag handles CRLF pairs split across reads.
+ *
+ * Full-screen programs (top/htop/vim) redraw by sending cursor-home and
+ * clear-screen sequences. Those are handled here so each redraw replaces the
+ * previous screen instead of being appended as a new block of text.
  */
 class TerminalBuffer(private val maxChars: Int = 40_000) {
     private val sb = StringBuilder()
@@ -86,11 +90,33 @@ class TerminalBuffer(private val maxChars: Int = 40_000) {
         if (sb.length > maxChars) sb.delete(0, sb.length - maxChars)
     }
 
+    /** Skip a CSI sequence, applying the few controls that affect our flat buffer. */
     private fun skipCsi(chunk: String, from: Int): Int {
         var i = from
+        val params = StringBuilder()
         while (i < chunk.length) {
             val c = chunk[i++]
-            if (c in '@'..'~') return i
+            if (c in '@'..'~') {
+                when (c) {
+                    // Erase display. ESC[J defaults to "from cursor to end", but
+                    // full-screen apps use ESC[2J for the whole screen.
+                    'J' -> if (params.isEmpty() || params.toString() == "2" || params.toString() == "3") clear()
+
+                    // Cursor home (1;1 or no params) starts a fresh full-screen frame.
+                    'H', 'f' -> {
+                        val parts = params.toString().split(';')
+                        val row = parts.getOrNull(0)?.toIntOrNull() ?: 1
+                        val col = parts.getOrNull(1)?.toIntOrNull() ?: 1
+                        if (row <= 1 && col <= 1) clear()
+                    }
+
+                    // Erase line. We do not track columns, so truncate to the
+                    // start of the current logical line.
+                    'K' -> truncateToLineStart()
+                }
+                return i
+            }
+            params.append(c)
         }
         return i
     }
