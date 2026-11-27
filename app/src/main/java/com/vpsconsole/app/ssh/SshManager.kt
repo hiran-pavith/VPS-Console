@@ -303,19 +303,18 @@ class SshManager(
         val rawResult = runCatching {
             markBusy(serverId)
             try {
-                ensureConnected(serverId).let { client ->
-                    val session = client.startSession()
-                    try {
-                        val cmd = session.exec(MetricsCollector.PROBE_COMMAND)
-                        withTimeout(30_000L) {
-                            cmd.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-                        }
-                    } finally {
-                        runCatching { session.close() }
+                val client = ensureConnected(serverId)
+                val session = client.startSession()
+                try {
+                    val cmd = session.exec(MetricsCollector.PROBE_COMMAND)
+                    withTimeout(30_000L) {
+                        cmd.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
                     }
                 } finally {
-                    markIdle(serverId)
+                    runCatching { session.close() }
                 }
+            } finally {
+                markIdle(serverId)
             }
         }
         rawResult.mapCatching { raw ->
