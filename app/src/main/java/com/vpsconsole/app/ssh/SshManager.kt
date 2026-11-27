@@ -1,0 +1,303 @@
+package com.vpsconsole.app.ssh
+
+import android.content.Context
+import com.vpsconsole.app.data.model.MetricEntity
+import com.vpsconsole.app.data.model.ServerProfile
+import com.vpsconsole.app.data.model.TunnelEntity
+import com.vpsconsole.app.data.model.TunnelType
+import com.vpsconsole.app.data.repo.KnownHostRepository
+import com.vpsconsole.app.data.repo.MetricRepository
+import com.vpsconsole.app.data.repo.ServerRepository
+import com.vpsconsole.app.data.settings.AppSettings
+import com.vpsconsole.app.data.settings.SettingsStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import net.schmizz.sshj.DefaultConfig
+import net.schmizz.sshj.SSHClient
+import net.schmizz.sshj.common.SecurityUtils
+import net.schmizz.sshj.connection.channel.direct.LocalPortForwarder
+import net.schmizz.sshj.connection.channel.direct.Parameters
+import net.schmizz.sshj.connection.channel.forwarded.RemotePortForwarder
+import net.schmizz.sshj.connection.channel.forwarded.SocketForwardingConnectListener
+import net.schmizz.sshj.sftp.SFTPClient
+import net.schmizz.sshj.transport.verification.HostKeyVerifier
+import net.schmizz.sshj.userauth.password.PasswordUtils
+import java.net.InetSocketAddress
+import java.net.ServerSocket
+import java.security.PublicKey
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
+
+/**
+ * SSHJ uses SpongyCastle as its JCE provider on Android. SC 1.58 does not expose
+ * X25519 or Ed25519 JCA mappings, so those algorithms are removed from negotiation.
+ * ECDSA/RSA/DH/SHA-256 are provided by SC and remain enabled.
+ */
+private class AndroidSshConfig : DefaultConfig() {
+    init {
+        setKeyExchangeFactories(
+            keyExchangeFactories.filterNot { it.name.contains("curve25519", ignoreCase = true) }
+        )
+        setKeyAlgorithms(
+            keyAlgorithms.filterNot { it.name.contains("ed25519", ignoreCase = true) }
+        )
+    }
+}
+
+class SshManager(
+    context: Context,
+    private val serverRepo: ServerRepository,
+    private val knownHostRepo: KnownHostRepository,
+    private val metricRepo: MetricRepository,
+    private val settings: SettingsStore
+) {
+    private val appContext = context.applicationContext
+    private val handles = ConcurrentHashMap<Long, Handle>()
+    private val activeTunnels = ConcurrentHashMap<Long, ActiveTunnel>()
+    private val lastMetrics = ConcurrentHashMap<Long, MetricEntity>()
+    private val collector = MetricsCollector()
+
+    private val _states = MutableStateFlow<Map<Long, ConnectionState>>(emptyMap())
+    val states: StateFlow<Map<Long, ConnectionState>> = _states.asStateFlow()
+
+    private val _events = MutableSharedFlow<SshEvent>(extraBufferCapacity = 64)
+    val events: SharedFlow<SshEvent> = _events.asSharedFlow()
+
+    private data class Handle(
+        val server: ServerProfile,
+        val client: SSHClient,
+        var shell: ShellSession? = null
+    )
+
+    private data class ActiveTunnel(
+        val serverId: Long,
+        var forwarder: LocalPortForwarder? = null,
+        var serverSocket: ServerSocket? = null,
+        var forward: RemotePortForwarder.Forward? = null,
+        var job: Job? = null
+    )
+
+    fun stateOf(serverId: Long): ConnectionState = states.value[serverId] ?: ConnectionState.DISCONNECTED
+
+    fun isConnected(serverId: Long): Boolean =
+        handles[serverId]?.client?.isConnected == true && handles[serverId]?.client?.isAuthenticated == true
+
+    fun shellFor(serverId: Long): ShellSession? = handles[serverId]?.shell
+
+    private fun setState(serverId: Long, state: ConnectionState, message: String = "") {
+        _states.value = _states.value + (serverId to state)
+        _events.tryEmit(SshEvent(serverId, state, message))
+    }
+
+    suspend fun connect(serverId: Long): Result<Unit> = withContext(Dispatchers.IO) {
+        val current = handles[serverId]
+        if (current != null && current.client.isConnected && current.client.isAuthenticated) {
+            return@withContext Result.success(Unit)
+        }
+        close(serverId)
+
+        val server = serverRepo.get(serverId)
+            ?: return@withContext Result.failure(IllegalArgumentException("Server not found"))
+        val secret = serverRepo.secretFor(server)
+            ?: return@withContext Result.failure(IllegalStateException("No credential stored for this server"))
+        if (secret.isEmpty()) {
+            return@withContext Result.failure(IllegalStateException("No credential stored for this server"))
+        }
+
+        setState(serverId, ConnectionState.CONNECTING)
+        val client = SSHClient(AndroidSshConfig())
+        runCatching {
+            val policy = settings.settings.value.hostKeyPolicy
+            val known = knownHostRepo.forHost(server.host, server.port)
+            client.transport.timeoutMs = 30_000
+            client.addHostKeyVerifier(object : HostKeyVerifier {
+                override fun verify(hostname: String?, port: Int, key: PublicKey?): Boolean {
+                    if (key == null) return false
+                    val fingerprint = SecurityUtils.getFingerprint(key)
+                    val algorithm = key.algorithm ?: "UNKNOWN"
+                    val trusted = known.firstOrNull { it.algorithm == algorithm }
+                    if (trusted != null) return trusted.fingerprint == fingerprint
+                    if (policy == com.vpsconsole.app.data.model.HostKeyPolicy.STRICT) return false
+                    return runCatching {
+                        runBlocking(Dispatchers.IO) {
+                            knownHostRepo.trust(server.host, server.port, algorithm, fingerprint)
+                        }
+                        true
+                    }.getOrDefault(false)
+                }
+
+                override fun findExistingAlgorithms(hostname: String?, port: Int): List<String> =
+                    known.map { it.algorithm }.distinct()
+            })
+
+            client.connect(server.host, server.port)
+            client.connection.keepAlive.keepAliveInterval = settings.settings.value.keepAliveSeconds
+
+            if (server.authType == com.vpsconsole.app.data.model.AuthType.KEY) {
+                val passphrase = serverRepo.passphraseFor(server)
+                val passwordFinder = passphrase?.takeIf { it.isNotEmpty() }
+                    ?.let { PasswordUtils.createOneOff(it.toCharArray()) }
+                val keyProvider = client.loadKeys(secret.trim(), null, passwordFinder)
+                client.authPublickey(server.username, keyProvider)
+            } else {
+                client.authPassword(server.username, secret)
+            }
+            if (!client.isAuthenticated) throw IllegalStateException("Authentication failed")
+
+            handles[serverId] = Handle(server, client)
+            setState(serverId, ConnectionState.CONNECTED)
+            serverRepo.touch(serverId, System.currentTimeMillis())
+        }.onFailure { error ->
+            runCatching { client.disconnect() }
+            setState(serverId, ConnectionState.FAILED, error.message ?: "Connection failed")
+        }
+    }
+
+    fun close(serverId: Long) {
+        val handle = handles.remove(serverId)
+        runCatching { handle?.shell?.close() }
+        runCatching { handle?.client?.disconnect() }
+        activeTunnels.filter { it.value.serverId == serverId }.keys.forEach(::stopTunnel)
+        setState(serverId, ConnectionState.DISCONNECTED)
+    }
+
+    fun closeAll() {
+        handles.keys.toList().forEach(::close)
+    }
+
+    suspend fun exec(serverId: Long, command: String, timeoutSeconds: Long = 45): Result<String> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val client = ensureConnected(serverId)
+                val session = client.startSession()
+                try {
+                    val fullCommand = if (command.contains("2>&1")) command else "$command 2>&1"
+                    val cmd = session.exec(fullCommand)
+                    val output = cmd.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                    runCatching { cmd.join(3, TimeUnit.SECONDS) }
+                    output.trimEnd()
+                } finally {
+                    runCatching { session.close() }
+                }
+            }
+        }
+
+    suspend fun <T> withSftp(serverId: Long, block: suspend (SFTPClient) -> T): Result<T> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val client = ensureConnected(serverId)
+                val sftp = client.newSFTPClient()
+                try {
+                    block(sftp)
+                } finally {
+                    runCatching { sftp.close() }
+                }
+            }
+        }
+
+    suspend fun startShell(serverId: Long): Result<ShellSession> = withContext(Dispatchers.IO) {
+        runCatching {
+            ensureConnected(serverId)
+            val handle = handles[serverId]
+                ?: throw IllegalStateException("SSH connection is not available")
+            handle.shell?.takeIf { !it.closed.value }?.let { return@runCatching it }
+            val session = ShellSession(handle.client)
+            handle.shell = session
+            session
+        }
+    }
+
+    suspend fun collect(serverId: Long): Result<MetricEntity> = withContext(Dispatchers.IO) {
+        runCatching {
+            val raw = ensureConnected(serverId).let { client ->
+                val session = client.startSession()
+                try {
+                    val cmd = session.exec(MetricsCollector.PROBE_COMMAND)
+                    cmd.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                } finally {
+                    runCatching { session.close() }
+                }
+            }
+            val metric = collector.parse(raw, serverId, lastMetrics[serverId], System.currentTimeMillis())
+            lastMetrics[serverId] = metric
+            metricRepo.add(metric)
+            metric
+        }
+    }
+
+    suspend fun startTunnel(tunnel: TunnelEntity): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            if (activeTunnels.containsKey(tunnel.id)) return@runCatching
+            val client = ensureConnected(tunnel.serverId)
+            val active = ActiveTunnel(tunnel.serverId)
+            if (tunnel.type == TunnelType.LOCAL) {
+                val socket = ServerSocket().apply {
+                    reuseAddress = true
+                    bind(InetSocketAddress("127.0.0.1", tunnel.localPort))
+                }
+                val params = Parameters(
+                    "127.0.0.1", tunnel.localPort, tunnel.targetHost, tunnel.targetPort
+                )
+                val forwarder = client.newLocalPortForwarder(params, socket)
+                val job = CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+                    runCatching { forwarder.listen() }
+                }
+                active.forwarder = forwarder
+                active.serverSocket = socket
+                active.job = job
+            } else {
+                val bindHost = tunnel.remoteBindHost.trim()
+                val forward = if (bindHost.isEmpty()) {
+                    RemotePortForwarder.Forward(tunnel.remotePort)
+                } else {
+                    RemotePortForwarder.Forward(bindHost, tunnel.remotePort)
+                }
+                active.forward = client.remotePortForwarder.bind(
+                    forward,
+                    SocketForwardingConnectListener(
+                        InetSocketAddress(tunnel.targetHost, tunnel.targetPort)
+                    )
+                )
+            }
+            activeTunnels[tunnel.id] = active
+        }
+    }
+
+    fun stopTunnel(tunnelId: Long) {
+        val active = activeTunnels.remove(tunnelId) ?: return
+        runCatching { active.forwarder?.close() }
+        runCatching { active.serverSocket?.close() }
+        active.forward?.let { forward ->
+            handles[active.serverId]?.client?.let { runCatching { it.remotePortForwarder.cancel(forward) } }
+        }
+        active.job?.cancel()
+    }
+
+    fun isTunnelRunning(tunnelId: Long): Boolean = activeTunnels.containsKey(tunnelId)
+
+    private suspend fun ensureConnected(serverId: Long): SSHClient {
+        handles[serverId]?.let { handle ->
+            if (handle.client.isConnected && handle.client.isAuthenticated) return handle.client
+        }
+        val result = connect(serverId)
+        if (result.isFailure) throw result.exceptionOrResultFailure()
+        return handles[serverId]?.client ?: throw IllegalStateException("SSH connection is not available")
+    }
+
+    private fun Result<*>.exceptionOrResultFailure(): Throwable =
+        exceptionOrNull() ?: IllegalStateException("Connection failed")
+
+    val currentSettings: AppSettings get() = settings.settings.value
+}

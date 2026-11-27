@@ -1,0 +1,67 @@
+package com.vpsconsole.app.ssh
+
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import net.schmizz.sshj.SSHClient
+import net.schmizz.sshj.connection.channel.direct.Session
+import java.io.InputStreamReader
+
+/** An interactive remote shell attached to one SSH session. */
+class ShellSession(client: SSHClient) {
+    private val session: Session = client.startSession().also { it.allocateDefaultPTY() }
+    private val shell: Session.Shell = session.startShell()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    val output = MutableSharedFlow<String>(extraBufferCapacity = 512)
+    val errors = MutableSharedFlow<String>(extraBufferCapacity = 64)
+    val closed = MutableStateFlow(false)
+
+    init {
+        scope.launch {
+            val buffer = CharArray(2048)
+            val reader = InputStreamReader(shell.inputStream, Charsets.UTF_8)
+            runCatching {
+                while (!closed.value) {
+                    val read = reader.read(buffer)
+                    if (read < 0) break
+                    if (read > 0) output.tryEmit(String(buffer, 0, read))
+                }
+            }.onFailure { errors.tryEmit(it.message ?: "Shell read failed") }
+            closed.value = true
+        }
+        scope.launch {
+            val buffer = CharArray(1024)
+            val reader = InputStreamReader(shell.errorStream, Charsets.UTF_8)
+            runCatching {
+                while (!closed.value) {
+                    val read = reader.read(buffer)
+                    if (read < 0) break
+                    if (read > 0) errors.tryEmit(String(buffer, 0, read))
+                }
+            }
+        }
+    }
+
+    fun write(text: String) {
+        runCatching {
+            shell.outputStream.write(text.toByteArray(Charsets.UTF_8))
+            shell.outputStream.flush()
+        }.onFailure { errors.tryEmit(it.message ?: "Write failed") }
+    }
+
+    fun resize(cols: Int, rows: Int) {
+        runCatching { shell.changeWindowDimensions(cols, rows, 0, 0) }
+    }
+
+    fun close() {
+        closed.value = true
+        runCatching { shell.close() }
+        runCatching { session.close() }
+        scope.cancel()
+    }
+}
