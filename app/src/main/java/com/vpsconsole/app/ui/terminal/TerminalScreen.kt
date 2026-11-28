@@ -3,6 +3,7 @@ package com.vpsconsole.app.ui.terminal
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,18 +11,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -35,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontFamily
@@ -64,10 +62,15 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
     // A shell can finish starting after this screen has been disposed; never
     // publish such a shell, or it would keep running with no collector.
     var sessionActive by remember(serverId) { mutableStateOf(true) }
-    var directTyping by remember(serverId) { mutableStateOf(true) }
+    // With no visible textbox, direct typing is the only input mode.
+    val directTyping = true
     val inputFocus = remember { FocusRequester() }
     val scroll = rememberScrollState()
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(serverId) {
+        runCatching { inputFocus.requestFocus() }
+    }
 
     LaunchedEffect(serverId, reconnectKey) {
         sessionActive = true
@@ -222,9 +225,6 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
                 status = "Disconnected"
                 shell = null
             }) { Text("Disconnect") }
-            OutlinedButton(onClick = { directTyping = !directTyping }) {
-                Text(if (directTyping) "Direct: on" else "Direct: off")
-            }
             OutlinedButton(onClick = { buffer.clear(); rendered = "" }) { Text("Clear") }
         }
 
@@ -247,19 +247,15 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
             )
         }
 
-        OutlinedTextField(
+        // Invisible keyboard surface. It keeps the soft keyboard connected to
+        // the PTY while the terminal itself occupies the whole screen.
+        BasicTextField(
             value = input,
             onValueChange = { next -> if (directTyping) typeDirect(next) else input = next },
-            label = { Text(if (directTyping) "Type here · direct to shell" else "Command") },
-            modifier = Modifier.fillMaxWidth().focusRequester(inputFocus),
+            modifier = Modifier.size(1.dp).alpha(0f).focusRequester(inputFocus),
             singleLine = true,
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Send),
-            keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSend = { submitInput() }),
-            trailingIcon = {
-                IconButton(onClick = { submitInput() }) {
-                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
-                }
-            }
+            keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSend = { submitInput() })
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
