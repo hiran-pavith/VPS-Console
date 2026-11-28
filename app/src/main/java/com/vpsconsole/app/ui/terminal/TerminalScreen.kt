@@ -296,15 +296,15 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
             ) {
                 OutlinedButton(onClick = {
                     recallHistory(if (history.isEmpty()) 0 else (historyIndex - 1).coerceAtLeast(0))
-                }) { Text("History ↑") }
+                }) { ButtonText("History ↑") }
                 OutlinedButton(onClick = {
                     recallHistory((historyIndex + 1).coerceAtMost(history.size))
-                }) { Text("History ↓") }
+                }) { ButtonText("History ↓") }
                 listOf(
                     "Ctrl+C" to "\u0003", "Tab" to "\t", "Esc" to "\u001B",
                     "↑" to "\u001B[A", "↓" to "\u001B[B", "Ctrl+D" to "\u0004"
                 ).forEach { (label, sequence) ->
-                    OutlinedButton(onClick = { send(sequence, appendHistory = false) }) { Text(label) }
+                    OutlinedButton(onClick = { send(sequence, appendHistory = false) }) { ButtonText(label) }
                 }
             }
 
@@ -317,7 +317,7 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
                         OutlinedButton(onClick = {
                             scope.launch { container.commandRepo.markUsed(command) }
                             runSavedCommand(command.command)
-                        }) { Text(command.title) }
+                        }) { ButtonText(command.title) }
                     }
                 }
             }
