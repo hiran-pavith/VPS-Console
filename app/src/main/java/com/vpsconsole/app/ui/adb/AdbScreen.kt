@@ -5,7 +5,6 @@ package com.vpsconsole.app.ui.adb
 import android.annotation.SuppressLint
 import android.graphics.BitmapFactory
 import android.util.Base64
-import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -47,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import com.vpsconsole.app.adb.AdbConfig
 import com.vpsconsole.app.adb.AdbManager
 import com.vpsconsole.app.adb.adbOutput
+import com.vpsconsole.app.data.model.ServerProfile
 import com.vpsconsole.app.ssh.SftpStreams
 import com.vpsconsole.app.ui.LocalAppContainer
 import com.vpsconsole.app.ui.components.EmptyState
@@ -77,31 +77,21 @@ private val adbTabs = listOf("Ports", "Shell", "Apps", "Logs", "Input", "Files",
 
 @Composable
 fun AdbScreen(serverId: Long) {
-    var fatal by remember(serverId) { mutableStateOf<String?>(null) }
-    if (fatal != null) {
-        Column(
-            Modifier.fillMaxSize().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text("ADB screen error", style = MaterialTheme.typography.headlineSmall)
-            Text(fatal.orEmpty(), style = MaterialTheme.typography.bodySmall)
-            Button(onClick = { fatal = null }) { Text("Retry") }
-        }
+    val container = LocalAppContainer.current
+    val servers by container.serverRepo.servers.collectAsState(emptyList())
+    val server = servers.firstOrNull { it.id == serverId }
+    if (server == null) {
+        EmptyState("Select a valid server before opening the ADB console.")
         return
     }
-    runCatching { AdbScreenBody(serverId) }.onFailure { error ->
-        Log.e("AdbScreen", "ADB screen failed", error)
-        fatal = error.message ?: "Unknown error"
-    }
+    AdbScreenContent(serverId, server)
 }
 
 @SuppressLint("SdCardPath")
 @Composable
-private fun AdbScreenBody(serverId: Long) {
+private fun AdbScreenContent(serverId: Long, server: ServerProfile) {
     val container = LocalAppContainer.current
     val context = LocalContext.current
-    val servers by container.serverRepo.servers.collectAsState(emptyList())
-    val server = servers.firstOrNull { it.id == serverId }
     val settings by container.settings.settings.collectAsState()
     val scope = rememberCoroutineScope()
     val adb = remember(serverId) { AdbManager(container.ssh, serverId) }
@@ -170,8 +160,8 @@ private fun AdbScreenBody(serverId: Long) {
         }
     }
 
-    LaunchedEffect(liveLogs, config, server?.id) {
-        if (!liveLogs || server == null) return@LaunchedEffect
+    LaunchedEffect(liveLogs, config, server.id) {
+        if (!liveLogs) return@LaunchedEffect
         while (liveLogs) {
             val lines = logLines.toIntOrNull()?.coerceIn(20, 2000) ?: 300
             runCatching { adb.logcat(config, lines).adbOutput() }
@@ -250,11 +240,6 @@ private fun AdbScreenBody(serverId: Long) {
                 }.getOrElse { "Save failed: ${it.message}" }
             }
         }
-    }
-
-    if (server == null) {
-        EmptyState("Select a valid server before opening the ADB console.")
-        return
     }
 
     Column(
