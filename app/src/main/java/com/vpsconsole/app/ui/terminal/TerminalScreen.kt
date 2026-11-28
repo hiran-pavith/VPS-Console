@@ -17,7 +17,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -214,94 +213,109 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
         }
     }
 
-    val scheme = com.vpsconsole.app.ui.theme.TerminalScheme.from(settings.terminalColorScheme)
-    Column(
-        Modifier.fillMaxSize().padding(8.dp).background(androidx.compose.ui.graphics.Color(scheme.background)),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onExit) { Text("← Back") }
-            Text(
-                status,
-                Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (status.startsWith("Connected")) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            OutlinedButton(onClick = {
-                suppressReconnect = true
-                container.ssh.shellFor(serverId)?.close()
-                container.ssh.close(serverId)
-                status = "Disconnected"
-                shell = null
-            }) { Text("Disconnect") }
-            OutlinedButton(onClick = { buffer.clear(); rendered = "" }) { Text("Clear") }
-        }
-
-        Card(
-            modifier = Modifier.weight(1f).fillMaxWidth()
-                .clickable {
-                    inputFocus.requestFocus()
-                    keyboardController?.show()
-                },
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    val scheme = TerminalScheme.from(settings.terminalColorScheme)
+    TerminalTheme(scheme) {
+        Column(
+            Modifier.fillMaxSize().padding(10.dp).background(Color(scheme.background)),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = rendered.ifEmpty { "Connecting to server…" },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scroll)
-                    .horizontalScroll(rememberScrollState())
-                    .padding(10.dp),
-                fontFamily = FontFamily.Monospace,
-                fontSize = settings.terminalFontSize.sp,
-                color = androidx.compose.ui.graphics.Color(scheme.foreground)
-            )
-        }
-
-        // Invisible keyboard surface. It keeps the soft keyboard connected to
-        // the PTY while the terminal itself occupies the whole screen.
-        BasicTextField(
-            value = input,
-            onValueChange = { next -> if (directTyping) typeDirect(next) else input = next },
-            modifier = Modifier.size(1.dp).alpha(0f).focusRequester(inputFocus),
-            singleLine = true,
-            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Send),
-            keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSend = { submitInput() })
-        )
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = {
-                recallHistory(if (history.isEmpty()) 0 else (historyIndex - 1).coerceAtLeast(0))
-            }, modifier = Modifier.weight(1f)) { Text("History ↑") }
-            Button(onClick = {
-                recallHistory((historyIndex + 1).coerceAtMost(history.size))
-            }, modifier = Modifier.weight(1f)) { Text("History ↓") }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            listOf(
-                "Ctrl+C" to "\u0003", "Tab" to "\t", "Esc" to "\u001B",
-                "↑" to "\u001B[A", "↓" to "\u001B[B", "Ctrl+D" to "\u0004"
-            ).forEach { (label, sequence) ->
-                OutlinedButton(onClick = { send(sequence, appendHistory = false) }) { Text(label) }
-            }
-        }
-
-        if (commands.isNotEmpty()) {
             Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedButton(onClick = onExit) { Text("← Back") }
+                Spacer(
+                    Modifier.size(8.dp).background(Color(scheme.accent), RoundedCornerShape(4.dp))
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "TERMINAL",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(scheme.accent)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    status,
+                    Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (status.startsWith("Connected")) Color(scheme.accent)
+                    else Color(scheme.foreground).copy(alpha = 0.75f),
+                    maxLines = 1
+                )
+                OutlinedButton(onClick = {
+                    suppressReconnect = true
+                    container.ssh.shellFor(serverId)?.close()
+                    container.ssh.close(serverId)
+                    status = "Disconnected"
+                    shell = null
+                }) { Text("Disconnect") }
+                OutlinedButton(onClick = { buffer.clear(); rendered = "" }) { Text("Clear") }
+            }
+
+            Card(
+                modifier = Modifier.weight(1f).fillMaxWidth()
+                    .border(1.dp, Color(scheme.border), RoundedCornerShape(12.dp))
+                    .clickable {
+                        inputFocus.requestFocus()
+                        keyboardController?.show()
+                    },
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(scheme.panel))
+            ) {
+                Text(
+                    text = rendered.ifEmpty { "Connecting to server…" },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scroll)
+                        .horizontalScroll(rememberScrollState())
+                        .padding(12.dp),
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = settings.terminalFontSize.sp,
+                    color = Color(scheme.foreground)
+                )
+            }
+
+            // Invisible keyboard surface. It keeps the soft keyboard connected
+            // to the PTY while the terminal itself owns the whole screen.
+            BasicTextField(
+                value = input,
+                onValueChange = { next -> if (directTyping) typeDirect(next) else input = next },
+                modifier = Modifier.size(1.dp).alpha(0f).focusRequester(inputFocus),
+                singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSend = { submitInput() })
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                commands.take(12).forEach { command ->
-                    OutlinedButton(onClick = {
-                        scope.launch { container.commandRepo.markUsed(command) }
-                        runSavedCommand(command.command)
-                    }) { Text(command.title) }
+                OutlinedButton(onClick = {
+                    recallHistory(if (history.isEmpty()) 0 else (historyIndex - 1).coerceAtLeast(0))
+                }) { Text("History ↑") }
+                OutlinedButton(onClick = {
+                    recallHistory((historyIndex + 1).coerceAtMost(history.size))
+                }) { Text("History ↓") }
+                listOf(
+                    "Ctrl+C" to "\u0003", "Tab" to "\t", "Esc" to "\u001B",
+                    "↑" to "\u001B[A", "↓" to "\u001B[B", "Ctrl+D" to "\u0004"
+                ).forEach { (label, sequence) ->
+                    OutlinedButton(onClick = { send(sequence, appendHistory = false) }) { Text(label) }
+                }
+            }
+
+            if (commands.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    commands.take(12).forEach { command ->
+                        OutlinedButton(onClick = {
+                            scope.launch { container.commandRepo.markUsed(command) }
+                            runSavedCommand(command.command)
+                        }) { Text(command.title) }
+                    }
                 }
             }
         }
