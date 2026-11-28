@@ -123,9 +123,16 @@ private fun AdbScreenContent(serverId: Long, server: ServerProfile) {
     var liveLogs by remember { mutableStateOf(false) }
     var screenshotOutput by remember { mutableStateOf("") }
     var screenshotBytes by remember { mutableStateOf<ByteArray?>(null) }
-    val screenshotBitmap = remember(screenshotBytes) {
-        screenshotBytes?.let { bytes ->
-            runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() }.getOrNull()
+    var screenshotBitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    LaunchedEffect(screenshotBytes) {
+        val bytes = screenshotBytes
+        screenshotBitmap = withContext(Dispatchers.Default) {
+            if (bytes == null) null else runCatching {
+                // Downsample on a background thread so a large capture cannot
+                // block composition or exhaust the UI thread's memory budget.
+                val options = BitmapFactory.Options().apply { inSampleSize = 2 }
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)?.asImageBitmap()
+            }.getOrNull()
         }
     }
 
@@ -270,12 +277,12 @@ private fun AdbScreenContent(serverId: Long, server: ServerProfile) {
                 AdaptiveActionRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = reverseDevicePort, onValueChange = { reverseDevicePort = it },
-                        label = { Text("Device port") }, modifier = Modifier.weight(1f), singleLine = true,
+                        label = { Text("Device port") }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                     OutlinedTextField(
                         value = reverseHostPort, onValueChange = { reverseHostPort = it },
-                        label = { Text("Host port") }, modifier = Modifier.weight(1f), singleLine = true,
+                        label = { Text("Host port") }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                 }
@@ -286,23 +293,23 @@ private fun AdbScreenContent(serverId: Long, server: ServerProfile) {
                         if (d != null && h != null && d in 1..65535 && h in 1..65535) {
                             runAdb({ adb.reverseAdd(config, d, h) }) { portOutput = it }
                         } else portOutput = "Enter ports between 1 and 65535"
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Add reverse") }
+                    }, enabled = !busy) { Text("Add reverse") }
                     OutlinedButton(onClick = {
                         val d = removePort.toIntOrNull()
                         if (d != null && d in 1..65535) {
                             runAdb({ adb.reverseRemove(config, d) }) { portOutput = it }
                         } else portOutput = "Enter a valid device port"
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Remove reverse") }
+                    }, enabled = !busy) { Text("Remove reverse") }
                 }
                 AdaptiveActionRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = forwardHostPort, onValueChange = { forwardHostPort = it },
-                        label = { Text("Host listen port") }, modifier = Modifier.weight(1f), singleLine = true,
+                        label = { Text("Host listen port") }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                     OutlinedTextField(
                         value = forwardDevicePort, onValueChange = { forwardDevicePort = it },
-                        label = { Text("Device target port") }, modifier = Modifier.weight(1f), singleLine = true,
+                        label = { Text("Device target port") }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                 }
@@ -313,13 +320,13 @@ private fun AdbScreenContent(serverId: Long, server: ServerProfile) {
                         if (h != null && d != null && h in 1..65535 && d in 1..65535) {
                             runAdb({ adb.forwardAdd(config, h, d) }) { portOutput = it }
                         } else portOutput = "Enter ports between 1 and 65535"
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Add forward") }
+                    }, enabled = !busy) { Text("Add forward") }
                     OutlinedButton(onClick = {
                         val h = removePort.toIntOrNull()
                         if (h != null && h in 1..65535) {
                             runAdb({ adb.forwardRemove(config, h) }) { portOutput = it }
                         } else portOutput = "Enter a valid host port"
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Remove forward") }
+                    }, enabled = !busy) { Text("Remove forward") }
                 }
                 OutlinedTextField(
                     value = removePort, onValueChange = { removePort = it },
@@ -330,22 +337,22 @@ private fun AdbScreenContent(serverId: Long, server: ServerProfile) {
                 AdaptiveActionRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = {
                         runAdb({ adb.devices(config) }) { portOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Devices") }
+                    }, enabled = !busy) { Text("Devices") }
                     OutlinedButton(onClick = {
                         runAdb({
                             val r = adb.reverseList(config).adbOutput()
                             val f = adb.forwardList(config).adbOutput()
                             Result.success("--- reverse ---\n$r\n\n--- forward ---\n$f")
                         }) { portOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("List") }
+                    }, enabled = !busy) { Text("List") }
                 }
                 AdaptiveActionRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = {
                         runAdb({ adb.reverseClear(config) }) { portOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Clear reverse") }
+                    }, enabled = !busy) { Text("Clear reverse") }
                     OutlinedButton(onClick = {
                         runAdb({ adb.forwardClear(config) }) { portOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Clear forward") }
+                    }, enabled = !busy) { Text("Clear forward") }
                 }
                 OutputBox(portOutput, Modifier.heightIn(min = 180.dp))
             }
@@ -378,21 +385,21 @@ private fun AdbScreenContent(serverId: Long, server: ServerProfile) {
                 AdaptiveActionRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     OutlinedButton(onClick = {
                         runAdb({ adb.packages(config) }) { packageOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("List") }
+                    }, enabled = !busy) { Text("List") }
                     OutlinedButton(onClick = {
                         if (packageName.isNotBlank()) runAdb({ adb.startPackage(config, packageName.trim()) }) { packageOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Start") }
+                    }, enabled = !busy) { Text("Start") }
                     OutlinedButton(onClick = {
                         if (packageName.isNotBlank()) runAdb({ adb.stopPackage(config, packageName.trim()) }) { packageOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Stop") }
+                    }, enabled = !busy) { Text("Stop") }
                 }
                 AdaptiveActionRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     OutlinedButton(onClick = {
                         if (apkPath.isNotBlank()) runAdb({ adb.install(config, apkPath.trim()) }) { packageOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Install") }
+                    }, enabled = !busy) { Text("Install") }
                     OutlinedButton(onClick = {
                         if (packageName.isNotBlank()) runAdb({ adb.uninstall(config, packageName.trim()) }) { packageOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Uninstall") }
+                    }, enabled = !busy) { Text("Uninstall") }
                 }
                 OutputBox(packageOutput, Modifier.heightIn(min = 200.dp))
             }
@@ -401,7 +408,7 @@ private fun AdbScreenContent(serverId: Long, server: ServerProfile) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = logLines, onValueChange = { logLines = it },
-                        label = { Text("Lines") }, modifier = Modifier.weight(1f), singleLine = true,
+                        label = { Text("Lines") }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                     Switch(checked = liveLogs, onCheckedChange = { liveLogs = it })
@@ -411,8 +418,8 @@ private fun AdbScreenContent(serverId: Long, server: ServerProfile) {
                     Button(onClick = {
                         val lines = logLines.toIntOrNull()?.coerceIn(20, 2000) ?: 300
                         runAdb({ adb.logcat(config, lines) }) { logOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Refresh log") }
-                    OutlinedButton(onClick = { logOutput = "" }, modifier = Modifier.weight(1f)) { Text("Clear") }
+                    }, enabled = !busy) { Text("Refresh log") }
+                    OutlinedButton(onClick = { logOutput = "" }) { Text("Clear") }
                 }
                 OutputBox(logOutput, Modifier.heightIn(min = 180.dp))
                 AdaptiveActionRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -432,9 +439,9 @@ private fun AdbScreenContent(serverId: Long, server: ServerProfile) {
                                 busy = false
                             }
                         }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Screenshot") }
+                    }, enabled = !busy) { Text("Screenshot") }
                     OutlinedButton(onClick = { saveScreenshot.launch("screenshot.png") },
-                        enabled = screenshotBytes != null, modifier = Modifier.weight(1f)) { Text("Save PNG") }
+                        enabled = screenshotBytes != null) { Text("Save PNG") }
                 }
                 Text(screenshotOutput, style = MaterialTheme.typography.bodySmall)
                 screenshotBitmap?.let { bitmap ->
@@ -449,25 +456,21 @@ private fun AdbScreenContent(serverId: Long, server: ServerProfile) {
             4 -> SectionCard(title = "Input") {
                 AdaptiveActionRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
-                        value = inputX, onValueChange = { inputX = it }, label = { Text("X") },
-                        modifier = Modifier.weight(1f), singleLine = true,
+                        value = inputX, onValueChange = { inputX = it }, label = { Text("X") }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                     OutlinedTextField(
-                        value = inputY, onValueChange = { inputY = it }, label = { Text("Y") },
-                        modifier = Modifier.weight(1f), singleLine = true,
+                        value = inputY, onValueChange = { inputY = it }, label = { Text("Y") }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                 }
                 AdaptiveActionRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
-                        value = inputEndX, onValueChange = { inputEndX = it }, label = { Text("End X") },
-                        modifier = Modifier.weight(1f), singleLine = true,
+                        value = inputEndX, onValueChange = { inputEndX = it }, label = { Text("End X") }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                     OutlinedTextField(
-                        value = inputEndY, onValueChange = { inputEndY = it }, label = { Text("End Y") },
-                        modifier = Modifier.weight(1f), singleLine = true,
+                        value = inputEndY, onValueChange = { inputEndY = it }, label = { Text("End Y") }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                 }
@@ -476,14 +479,14 @@ private fun AdbScreenContent(serverId: Long, server: ServerProfile) {
                         val x = inputX.toIntOrNull(); val y = inputY.toIntOrNull()
                         if (x != null && y != null) runAdb({ adb.inputTap(config, x, y) }) { inputOutput = it }
                         else inputOutput = "Enter numeric coordinates"
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Tap") }
+                    }, enabled = !busy) { Text("Tap") }
                     OutlinedButton(onClick = {
                         val x1 = inputX.toIntOrNull(); val y1 = inputY.toIntOrNull()
                         val x2 = inputEndX.toIntOrNull(); val y2 = inputEndY.toIntOrNull()
                         if (x1 != null && y1 != null && x2 != null && y2 != null) {
                             runAdb({ adb.inputSwipe(config, x1, y1, x2, y2, 300) }) { inputOutput = it }
                         } else inputOutput = "Enter numeric coordinates"
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Swipe") }
+                    }, enabled = !busy) { Text("Swipe") }
                 }
                 OutlinedTextField(
                     value = inputTextValue, onValueChange = { inputTextValue = it },
@@ -492,10 +495,9 @@ private fun AdbScreenContent(serverId: Long, server: ServerProfile) {
                 AdaptiveActionRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = {
                         runAdb({ adb.inputText(config, inputTextValue) }) { inputOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Type text") }
+                    }, enabled = !busy) { Text("Type text") }
                     OutlinedTextField(
-                        value = keyCode, onValueChange = { keyCode = it }, label = { Text("Key code") },
-                        modifier = Modifier.weight(1f), singleLine = true,
+                        value = keyCode, onValueChange = { keyCode = it }, label = { Text("Key code") }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                     OutlinedButton(onClick = {
@@ -514,10 +516,8 @@ private fun AdbScreenContent(serverId: Long, server: ServerProfile) {
                     label = { Text("Device path") }, modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
                 AdaptiveActionRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { pickPush.launch(arrayOf("*/*")) }, enabled = !busy,
-                        modifier = Modifier.weight(1f)) { Text("Push local file") }
-                    OutlinedButton(onClick = { pickPull.launch("download.bin") }, enabled = !busy,
-                        modifier = Modifier.weight(1f)) { Text("Pull to local file") }
+                    Button(onClick = { pickPush.launch(arrayOf("*/*")) }, enabled = !busy) { Text("Push local file") }
+                    OutlinedButton(onClick = { pickPull.launch("download.bin") }, enabled = !busy) { Text("Pull to local file") }
                 }
                 Text(
                     "Files are streamed through the VPS: local → SFTP → adb push, and adb pull → SFTP → local.",
@@ -531,10 +531,10 @@ private fun AdbScreenContent(serverId: Long, server: ServerProfile) {
                 AdaptiveActionRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = {
                         runAdb({ adb.deviceInfo(config) }) { infoOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Device info") }
+                    }, enabled = !busy) { Text("Device info") }
                     OutlinedButton(onClick = {
                         runAdb({ adb.processes(config) }) { processOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Processes") }
+                    }, enabled = !busy) { Text("Processes") }
                 }
                 OutputBox(infoOutput, Modifier.heightIn(min = 220.dp))
                 OutputBox(processOutput, Modifier.heightIn(min = 220.dp))
@@ -550,16 +550,16 @@ private fun AdbScreenContent(serverId: Long, server: ServerProfile) {
                 AdaptiveActionRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = {
                         runAdb({ adb.startServer(config) }) { hostOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Start server") }
+                    }, enabled = !busy) { Text("Start server") }
                     OutlinedButton(onClick = {
                         runAdb({ adb.version(config) }) { hostOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Version") }
+                    }, enabled = !busy) { Text("Version") }
                     OutlinedButton(onClick = {
                         runAdb({ adb.devices(config) }) { hostOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Devices") }
+                    }, enabled = !busy) { Text("Devices") }
                     OutlinedButton(onClick = {
                         runAdb({ adb.killServer(config) }) { hostOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Kill server") }
+                    }, enabled = !busy) { Text("Kill server") }
                 }
                 OutlinedTextField(
                     value = hostTarget, onValueChange = { hostTarget = it },
@@ -574,15 +574,15 @@ private fun AdbScreenContent(serverId: Long, server: ServerProfile) {
                 AdaptiveActionRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = {
                         if (hostTarget.isNotBlank()) runAdb({ adb.connect(config, hostTarget.trim()) }) { hostOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Connect") }
+                    }, enabled = !busy) { Text("Connect") }
                     OutlinedButton(onClick = {
                         if (hostTarget.isNotBlank()) runAdb({ adb.disconnect(config, hostTarget.trim()) }) { hostOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Disconnect") }
+                    }, enabled = !busy) { Text("Disconnect") }
                     OutlinedButton(onClick = {
                         if (hostTarget.isNotBlank() && pairCode.isNotBlank()) {
                             runAdb({ adb.pair(config, hostTarget.trim(), pairCode.trim()) }) { hostOutput = it }
                         } else hostOutput = "Enter a host:port and pairing code"
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Pair") }
+                    }, enabled = !busy) { Text("Pair") }
                 }
                 OutlinedTextField(
                     value = tcpipPort, onValueChange = { tcpipPort = it },
@@ -594,21 +594,21 @@ private fun AdbScreenContent(serverId: Long, server: ServerProfile) {
                         val port = tcpipPort.toIntOrNull()
                         if (port != null) runAdb({ adb.tcpip(config, port) }) { hostOutput = it }
                         else hostOutput = "Enter a numeric port"
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("TCP/IP") }
+                    }, enabled = !busy) { Text("TCP/IP") }
                     OutlinedButton(onClick = {
                         runAdb({ adb.root(config) }) { hostOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Root") }
+                    }, enabled = !busy) { Text("Root") }
                     OutlinedButton(onClick = {
                         runAdb({ adb.unroot(config) }) { hostOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Unroot") }
+                    }, enabled = !busy) { Text("Unroot") }
                 }
                 AdaptiveActionRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = {
                         runAdb({ adb.reboot(config) }) { hostOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Reboot") }
+                    }, enabled = !busy) { Text("Reboot") }
                     OutlinedButton(onClick = {
                         runAdb({ adb.reboot(config, "bootloader") }) { hostOutput = it }
-                    }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Bootloader") }
+                    }, enabled = !busy) { Text("Bootloader") }
                 }
                 OutputBox(hostOutput, Modifier.heightIn(min = 200.dp))
             }
