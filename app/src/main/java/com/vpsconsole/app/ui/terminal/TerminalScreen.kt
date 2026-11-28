@@ -224,7 +224,7 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedButton(onClick = onExit) { Text("← Back") }
+                OutlinedButton(onClick = onExit) { ButtonText("← Back") }
                 Spacer(
                     Modifier.size(8.dp).background(Color(scheme.accent), RoundedCornerShape(4.dp))
                 )
@@ -232,7 +232,9 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
                 Text(
                     "TERMINAL",
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color(scheme.accent)
+                    color = Color(scheme.accent),
+                    maxLines = 1,
+                    softWrap = false
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
@@ -241,7 +243,8 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (status.startsWith("Connected")) Color(scheme.accent)
                     else Color(scheme.foreground).copy(alpha = 0.75f),
-                    maxLines = 1
+                    maxLines = 1,
+                    softWrap = false
                 )
                 OutlinedButton(onClick = {
                     suppressReconnect = true
@@ -249,8 +252,8 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
                     container.ssh.close(serverId)
                     status = "Disconnected"
                     shell = null
-                }) { Text("Disconnect") }
-                OutlinedButton(onClick = { buffer.clear(); rendered = "" }) { Text("Clear") }
+                }) { ButtonText("Disconnect") }
+                OutlinedButton(onClick = { buffer.clear(); rendered = "" }) { ButtonText("Clear") }
             }
 
             Card(
@@ -320,6 +323,11 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
             }
         }
     }
+}
+
+@Composable
+private fun ButtonText(text: String) {
+    Text(text = text, maxLines = 1, softWrap = false)
 }
 
 private fun String.ifEndsWithNewline(): String = if (endsWith("\n")) this else "$this\n"
