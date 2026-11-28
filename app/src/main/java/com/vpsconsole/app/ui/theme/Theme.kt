@@ -24,16 +24,65 @@ enum class AccentTheme(val label: String, val light: Long, val dark: Long, val s
 }
 
 /** Terminal color schemes. */
-enum class TerminalScheme(val label: String, val foreground: Long, val background: Long) {
-    DEFAULT("Default", 0xFFE6EDF3, 0xFF0B0F14),
-    GREEN("Green on Black", 0xFF33FF66, 0xFF000000),
-    AMBER("Amber", 0xFFFFB000, 0xFF1A1000),
-    BLUE("Blue Light", 0xFF58A6FF, 0xFF04121F),
-    WHITE("Light", 0xFF1F2328, 0xFFF6F8FA);
+enum class TerminalScheme(
+    val label: String,
+    val foreground: Long,
+    val background: Long,
+    val accent: Long,
+    val panel: Long,
+    val border: Long
+) {
+    DEFAULT("Default", 0xFFE6EDF3, 0xFF0B0F14, 0xFF39C5CF, 0xFF121B26, 0xFF2B3A4A),
+    GREEN("Green on Black", 0xFF33FF66, 0xFF000000, 0xFF33FF66, 0xFF06140A, 0xFF14532D),
+    AMBER("Amber", 0xFFFFB000, 0xFF1A1000, 0xFFFFB000, 0xFF241A06, 0xFF6B4A00),
+    BLUE("Blue Light", 0xFF58A6FF, 0xFF04121F, 0xFF58A6FF, 0xFF092035, 0xFF1F4E79),
+    WHITE("Light", 0xFF1F2328, 0xFFF6F8FA, 0xFF0969DA, 0xFFEAEFF4, 0xFFB7C2CE);
 
     companion object {
         fun from(value: String): TerminalScheme = entries.firstOrNull { it.name.equals(value, ignoreCase = true) } ?: DEFAULT
     }
+}
+
+/** A terminal-only Material theme so the terminal tab does not look like the rest of the app. */
+@Composable
+fun TerminalTheme(scheme: TerminalScheme, content: @Composable () -> Unit) {
+    val background = Color(scheme.background)
+    val foreground = Color(scheme.foreground)
+    val accent = Color(scheme.accent)
+    val panel = Color(scheme.panel)
+    val border = Color(scheme.border)
+    val colors = if (scheme == TerminalScheme.WHITE) lightColorScheme(
+        primary = accent,
+        onPrimary = Color(0xFFFFFFFF),
+        primaryContainer = accent.copy(alpha = 0.12f),
+        onPrimaryContainer = foreground,
+        secondary = accent,
+        onSecondary = Color(0xFFFFFFFF),
+        background = background,
+        onBackground = foreground,
+        surface = panel,
+        onSurface = foreground,
+        surfaceVariant = panel,
+        onSurfaceVariant = foreground.copy(alpha = 0.78f),
+        outline = border,
+        error = Color(0xFFCF222E)
+    ) else darkColorScheme(
+        primary = accent,
+        onPrimary = background,
+        primaryContainer = accent.copy(alpha = 0.18f),
+        onPrimaryContainer = foreground,
+        secondary = accent,
+        onSecondary = background,
+        background = background,
+        onBackground = foreground,
+        surface = panel,
+        onSurface = foreground,
+        surfaceVariant = panel,
+        onSurfaceVariant = foreground.copy(alpha = 0.72f),
+        outline = border,
+        error = Color(0xFFFF6B6B)
+    )
+    MaterialTheme(colorScheme = colors, content = content)
 }
 
 private fun colorScheme(dark: Boolean, accent: AccentTheme) = if (dark) darkColorScheme(
