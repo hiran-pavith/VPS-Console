@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -65,11 +66,13 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
     // With no visible textbox, direct typing is the only input mode.
     val directTyping = true
     val inputFocus = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
     val scroll = rememberScrollState()
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(serverId) {
         runCatching { inputFocus.requestFocus() }
+        keyboardController?.show()
     }
 
     LaunchedEffect(serverId, reconnectKey) {
