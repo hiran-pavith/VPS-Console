@@ -233,7 +233,10 @@ fun TerminalScreen(serverId: Long, onExit: () -> Unit = {}) {
 
         Card(
             modifier = Modifier.weight(1f).fillMaxWidth()
-                .clickable { inputFocus.requestFocus() },
+                .clickable {
+                    inputFocus.requestFocus()
+                    keyboardController?.show()
+                },
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
