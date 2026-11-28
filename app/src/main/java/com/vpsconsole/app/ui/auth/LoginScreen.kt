@@ -13,11 +13,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.CloudSync
-import androidx.compose.material3.Button
+import com.vpsconsole.app.ui.components.SingleLineButton as Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
+import com.vpsconsole.app.ui.components.SingleLineOutlinedButton as OutlinedButton
+import com.vpsconsole.app.ui.components.AutoText as Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
