@@ -55,17 +55,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AdaptiveActionRow(
     modifier: Modifier = Modifier,
     horizontalArrangement: Arrangement.Horizontal = Arrangement.spacedBy(8.dp),
-    content: @Composable androidx.compose.foundation.layout.FlowRowScope.() -> Unit
+    content: @Composable RowScope.() -> Unit
 ) {
-    FlowRow(
-        modifier = modifier.fillMaxWidth(),
+    // Plain horizontally scrollable Row: no experimental layout weights that
+    // can throw during measurement on small screens.
+    Row(
+        modifier = modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = horizontalArrangement,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
         content = content
     )
 }
@@ -261,7 +261,16 @@ private fun AdbScreenContent(serverId: Long, server: ServerProfile) {
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             adbTabs.forEachIndexed { index, label ->
-                FilterChip(selected = tab == index, onClick = { tab = index }, label = { Text(label) })
+                val selected = tab == index
+                OutlinedButton(
+                    onClick = { tab = index },
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer
+                        else MaterialTheme.colorScheme.surface,
+                        contentColor = if (selected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurface
+                    )
+                ) { Text(label) }
             }
         }
 
